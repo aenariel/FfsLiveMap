@@ -1,0 +1,12 @@
+{
+  "name": "ffs-live-map",
+  "private": true,
+  "description": "Renders the Ffs bear trap PNG from the ksmapper plan and MightPulse positions",
+  "dependencies": {
+    "@expo-google-fonts/chakra-petch": "0.4.1",
+    "@expo-google-fonts/ibm-plex-mono": "0.4.1",
+    "@expo-google-fonts/ibm-plex-sans": "0.4.1",
+    "@expo-google-fonts/noto-sans-arabic": "0.4.3",
+    "@napi-rs/canvas": "0.1.65"
+  }
+}
