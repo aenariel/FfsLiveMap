@@ -6,7 +6,19 @@
     "@expo-google-fonts/chakra-petch": "0.4.1",
     "@expo-google-fonts/ibm-plex-mono": "0.4.1",
     "@expo-google-fonts/ibm-plex-sans": "0.4.1",
+    "@expo-google-fonts/noto-emoji": "0.4.8",
     "@expo-google-fonts/noto-sans-arabic": "0.4.3",
+    "@expo-google-fonts/noto-sans-devanagari": "0.4.1",
+    "@expo-google-fonts/noto-sans-hebrew": "0.4.1",
+    "@expo-google-fonts/noto-sans-jp": "0.4.4",
+    "@expo-google-fonts/noto-sans-kr": "0.4.4",
+    "@expo-google-fonts/noto-sans-math": "0.4.2",
+    "@expo-google-fonts/noto-sans-sc": "0.4.4",
+    "@expo-google-fonts/noto-sans-symbols": "0.4.1",
+    "@expo-google-fonts/noto-sans-symbols-2": "0.4.1",
+    "@expo-google-fonts/noto-sans-tc": "0.4.4",
+    "@expo-google-fonts/noto-sans-thai": "0.4.2",
+    "@expo-google-fonts/noto-serif-tibetan": "0.4.2",
     "@napi-rs/canvas": "0.1.65"
   }
 }
