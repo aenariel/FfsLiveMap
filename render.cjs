@@ -26,6 +26,26 @@ for (const [rel, family] of fonts) {
   const f = path.join(fontRoot, rel);
   if (fs.existsSync(f)) GlobalFonts.registerFromPath(f, family); else console.warn("missing font", rel);
 }
+// Fallback fonts for player names in other scripts (Chinese, Japanese, Korean, Hebrew, Thai, Devanagari, Tibetan, symbols, emoji).
+// The machine the daily run uses has no system fonts for these, so they must be bundled.
+const FALLBACK = [
+  ["noto-sans-sc", "Noto Sans SC"], ["noto-sans-tc", "Noto Sans TC"], ["noto-sans-jp", "Noto Sans JP"], ["noto-sans-kr", "Noto Sans KR"],
+  ["noto-sans-hebrew", "Noto Sans Hebrew"], ["noto-sans-thai", "Noto Sans Thai"], ["noto-sans-devanagari", "Noto Sans Devanagari"],
+  ["noto-serif-tibetan", "Noto Serif Tibetan"], ["noto-sans-symbols", "Noto Sans Symbols"], ["noto-sans-symbols-2", "Noto Sans Symbols 2"],
+  ["noto-sans-math", "Noto Sans Math"], ["noto-emoji", "Noto Emoji"]
+];
+const fallbackFamilies = [];
+for (const [pkg, family] of FALLBACK) {
+  const dir = path.join(fontRoot, pkg);
+  if (!fs.existsSync(dir)) { console.warn("missing font package", pkg); continue; }
+  const weights = fs.readdirSync(dir).filter(d => /^\d00[A-Za-z]+$/.test(d));
+  const use = weights.filter(w => /^(400|500|600|700)/.test(w));
+  for (const w of (use.length ? use : weights)) {
+    for (const f of fs.readdirSync(path.join(dir, w)).filter(n => n.endsWith(".ttf"))) GlobalFonts.registerFromPath(path.join(dir, w, f), family);
+  }
+  fallbackFamilies.push('"' + family + '"');
+}
+const FALLBACK_STACK = fallbackFamilies.join(", ");
 
 const html = fs.readFileSync(pagePath, "utf8");
 const script = html.split("<script>")[1].split("</script>")[0];
@@ -39,8 +59,11 @@ const atMatch = /^at,(\d+)/m.exec(liveTxt);
 const liveAt = atMatch ? Number(atMatch[1]) * 1000 : null;
 
 global.document = { createElement: () => createCanvas(10, 10) };
-const run = new Function("planCsv", "liveTxt", "liveAt", "fs", "outPath",
+const run = new Function("planCsv", "liveTxt", "liveAt", "fs", "outPath", "FALLBACK_STACK",
   code + `
+  F.body = '"IBM Plex Sans", "Noto Sans Arabic", ' + FALLBACK_STACK + ', sans-serif';
+  F.mono = '"IBM Plex Mono", "IBM Plex Sans", ' + FALLBACK_STACK + ', monospace';
+  F.display = '"Chakra Petch", "IBM Plex Sans", ' + FALLBACK_STACK + ', sans-serif';
   const live = { ...parseLive(liveTxt), at: liveAt };
   const o = { tag: "Ffs", kd: "#1130", roster: true, empty: true, live: true, times: false,
     key1: "BT1", key2: "BT2", key3: "BT3", radius: 18,
@@ -53,7 +76,7 @@ const run = new Function("planCsv", "liveTxt", "liveAt", "fs", "outPath",
   return { size: [cv.width, cv.height], count, renamed: m.renamed.map(c => c.label + " -> " + c.found.name),
     missing: m.cities.filter(c => c.status === "missing").map(c => c.label), unassigned: m.unassigned.map(u => u.name + " " + u.x + ":" + u.y) };
 `);
-const summary = run(planCsv, liveTxt, liveAt, fs, outPath);
+const summary = run(planCsv, liveTxt, liveAt, fs, outPath, FALLBACK_STACK);
 
 // Optional 5th argument: write a copy of the page with this plan and snapshot embedded as its saved data.
 const outHtml = process.argv[6];
