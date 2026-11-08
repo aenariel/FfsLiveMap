@@ -41,7 +41,7 @@ city,759,735,~PrincessPeach~,#008000,7417
 city,761,735,KleytonPL,#008000,7418
 city,763,735,STNR,#008000,7419
 city,760,742,A Chinese Meal,#008000,7420
-city,758,742,Edster,#00ff00,7422
+city,758,742,Edster,#008000,7422
 city,756,742,Garret,#008000,7424
 city,755,738,Athy,#008000,7426
 city,753,738,City,#4a9edd,7427
@@ -161,7 +161,11 @@ city,736,748,SBM,#4a9edd,10502
 city,731,742,SBM,#4a9edd,10507
 city,733,742,SBM,#4a9edd,10508
 city,735,743,SBM,#4a9edd,10509
-city,736,757,SBM,#4a9edd,10510
+city,737,757,SBM,#4a9edd,10510
 city,737,755,SBM,#4a9edd,10511
 city,737,753,SBM,#4a9edd,10512
 city,729,759,SBM,#4a9edd,10515
+hq,730,770,HAT,#8e44ad,17220
+beartrap,734,770,HAT,#c0392b,17300
+beartrap,730,774,HAT,#c0392b,17301
+city,735,758,SBM,#4a9edd,17368
