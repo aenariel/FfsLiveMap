@@ -2,7 +2,7 @@ name: Refresh bear trap maps
 
 on:
   schedule:
-    - cron: "0 0 * * *"   # 00:00 UTC, server reset (GitHub may start it a few minutes late)
+    - cron: "0 */6 * * *"   # 00:00, 06:00, 12:00, 18:00 UTC (GitHub may start a run a few minutes late)
   workflow_dispatch:
     inputs:
       update:
@@ -64,7 +64,7 @@ jobs:
             cp /tmp/out/* .
             git add $(cat .refresh-files)
             if git diff --cached --quiet; then echo "No changes to commit."; exit 0; fi
-            git commit -q -m "Daily refresh $(date -u +%F)"
+            git commit -q -m "Map refresh $(date -u '+%F %H:%M') UTC"
             git push -q origin "HEAD:$GITHUB_REF_NAME" && exit 0
             sleep 10
           done

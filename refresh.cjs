@@ -149,7 +149,20 @@ async function getData(report) {
 }
 
 // ---------- 3. Render ----------
-function renderMap(map, data, report) {
+// Palette PNG (256 colours, no dithering): about 70% smaller and visually identical for these
+// flat-colour maps. Keeps the repository history small with several refreshes a day.
+async function shrinkPng(file, report, name) {
+  try {
+    const sharp = require("sharp");
+    const buf = await sharp(fs.readFileSync(file))
+      .png({ palette: true, colours: 256, quality: 100, dither: 0, compressionLevel: 9, effort: 10 }).toBuffer();
+    fs.writeFileSync(file, buf);
+  } catch (e) {
+    report.warnings.push(`${name}: PNG compression skipped (${e.message})`);
+  }
+}
+
+async function renderMap(map, data, report) {
   const r = { ok: false };
   report.maps[map.name] = r;
   try {
@@ -171,6 +184,8 @@ function renderMap(map, data, report) {
     const out = execFileSync(process.execPath, [
       path.join(ROOT, map.renderer), path.join(ROOT, map.template), t("plan"), t("live"), t("png"), t("page")
     ], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+    await shrinkPng(t("png"), report, map.name);
+    r.pngKB = Math.round(fs.statSync(t("png")).size / 1024);
     for (const k of ["plan", "live", "png"]) {
       fs.copyFileSync(t(k), path.join(ROOT, map.files[k]));
       fs.appendFileSync(path.join(ROOT, ".refresh-files"), map.files[k] + "\n");
@@ -222,7 +237,7 @@ function writeJobSummary(report) {
     const ageH = (Date.now() / 1000 - data.at) / 3600;
     report.positionsAgeHours = Math.round(ageH * 10) / 10;
     if (ageH > STALE_HOURS) report.failures.push(`positions are ${Math.round(ageH)} h old (no fresh scan)`);
-    for (const map of MAPS) renderMap(map, data, report);
+    for (const map of MAPS) await renderMap(map, data, report);
   } catch (e) {
     report.failures.push(`fatal: ${e.message}`);
   }
