@@ -26,13 +26,16 @@ for (const [rel, family] of fonts) {
   const f = path.join(fontRoot, rel);
   if (fs.existsSync(f)) GlobalFonts.registerFromPath(f, family); else console.warn("missing font", rel);
 }
-// Fallback fonts for player names in other scripts (Chinese, Japanese, Korean, Hebrew, Thai, Devanagari, Tibetan, symbols, emoji).
+// Fallback fonts for player names in other scripts (Chinese, Japanese, Korean, Hebrew, Thai, Devanagari, Tibetan, symbols, emoji and more).
 // The machine the daily run uses has no system fonts for these, so they must be bundled.
 const FALLBACK = [
   ["noto-sans-sc", "Noto Sans SC"], ["noto-sans-tc", "Noto Sans TC"], ["noto-sans-jp", "Noto Sans JP"], ["noto-sans-kr", "Noto Sans KR"],
   ["noto-sans-hebrew", "Noto Sans Hebrew"], ["noto-sans-thai", "Noto Sans Thai"], ["noto-sans-devanagari", "Noto Sans Devanagari"],
   ["noto-serif-tibetan", "Noto Serif Tibetan"], ["noto-sans-symbols", "Noto Sans Symbols"], ["noto-sans-symbols-2", "Noto Sans Symbols 2"],
-  ["noto-sans-math", "Noto Sans Math"], ["noto-emoji", "Noto Emoji"]
+  ["noto-sans-math", "Noto Sans Math"], ["noto-emoji", "Noto Emoji"],
+  // Last resort for stylised names: phonetic small letters (ᵈ ᶦ ᶰ), Balinese, Canadian syllabics, Cherokee, runes.
+  ["noto-sans", "Noto Sans"], ["noto-sans-balinese", "Noto Sans Balinese"], ["noto-sans-canadian-aboriginal", "Noto Sans Canadian Aboriginal"],
+  ["noto-sans-cherokee", "Noto Sans Cherokee"], ["noto-sans-runic", "Noto Sans Runic"]
 ];
 const fallbackFamilies = [];
 for (const [pkg, family] of FALLBACK) {
