@@ -25,3 +25,4 @@ A GitHub Actions workflow (`.github/workflows/refresh.yml`) runs `refresh.cjs` e
 It sends one Update Map request to MightPulse, waits for the scan to leave the queue, reads the city positions and the ksmapper plan, and renders both maps.
 The two maps are independent: if one fails, the other is still updated.
 To run it by hand: Actions → Refresh bear trap maps → Run workflow.
+Each refresh replaces the previous refresh commit, so old images are not kept in the history.

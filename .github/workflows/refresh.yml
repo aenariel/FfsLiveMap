@@ -59,13 +59,21 @@ jobs:
           for i in 1 2 3; do
             # Start from the latest branch tip and lay the fresh files on top, so a re-run
             # or a concurrent commit never causes a merge conflict: the newest render wins.
-            git fetch -q origin "$GITHUB_REF_NAME"
+            git fetch -q --depth=2 origin "$GITHUB_REF_NAME"
             git reset -q --hard "origin/$GITHUB_REF_NAME"
+            TIP=$(git rev-parse HEAD)
             cp /tmp/out/* .
             git add $(cat .refresh-files)
             if git diff --cached --quiet; then echo "No changes to commit."; exit 0; fi
+            # If the tip is the previous refresh, replace it instead of stacking a new commit:
+            # old images never pile up in the history. Code commits are left untouched.
+            if [ "$(git log -1 --format=%an)" = "github-actions[bot]" ] \
+               && git log -1 --format=%s | grep -q '^Map refresh ' \
+               && git rev-parse -q --verify HEAD~1 >/dev/null; then
+              git reset -q --soft HEAD~1
+            fi
             git commit -q -m "Map refresh $(date -u '+%F %H:%M') UTC"
-            git push -q origin "HEAD:$GITHUB_REF_NAME" && exit 0
+            git push -q --force-with-lease="$GITHUB_REF_NAME:$TIP" origin "HEAD:$GITHUB_REF_NAME" && exit 0
             sleep 10
           done
           echo "::error::Push failed"
