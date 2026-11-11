@@ -1,0 +1,627 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>SBM Bear Trap Map</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* One column: title, status chips, the rendered PNG and a download button. The PNG has a fixed dark look so it reads the same in any chat app. */
+:root {
+  --bg: #f3f5f2;
+  --surface: #ffffff;
+  --fg: #17211d;
+  --muted: #5b6b64;
+  --line: #d7ddd8;
+  --accent: #9a6d0b;
+  --accent-ink: #ffffff;
+  --err-bg: #f8e1de;
+  --err-fg: #7d2118;
+  --stage: #0f1a17;
+  --display: "Chakra Petch", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1513; --surface: #16201d; --fg: #e8eee9; --muted: #97a8a0; --line: #2a3733;
+    --accent: #e3b84a; --accent-ink: #1a1405; --err-bg: #3d1a16; --err-fg: #f4b1a6; --stage: #0a1210; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1513; --surface: #16201d; --fg: #e8eee9; --muted: #97a8a0; --line: #2a3733;
+  --accent: #e3b84a; --accent-ink: #1a1405; --err-bg: #3d1a16; --err-fg: #f4b1a6; --stage: #0a1210; color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.wrap { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+header h1 { font-family: var(--display); font-weight: 700; font-size: clamp(26px, 4vw, 36px); margin: 0; letter-spacing: .01em; text-wrap: balance; }
+header h1 span { color: var(--accent); }
+header p { margin: 4px 0 0; color: var(--muted); max-width: 70ch; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.spacer { flex: 1 1 auto; }
+button {
+  font: 600 14px var(--body); border-radius: 7px; padding: 8px 14px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--fg);
+}
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+button:disabled { opacity: .55; cursor: default; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px; color: var(--muted); }
+.chip { display: inline-flex; gap: 6px; align-items: center; padding: 3px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+.msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; }
+.msg.err { background: var(--err-bg); color: var(--err-fg); }
+.msg.ok { background: var(--surface); border: 1px solid var(--line); }
+.stage { background: var(--stage); border-radius: 10px; overflow-x: auto; overflow-y: hidden; }
+.stage img { display: block; width: 100%; height: auto; max-width: 100%; }
+.stage.actual img { width: auto; max-width: none; }
+code { font-size: .92em; overflow-wrap: anywhere; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1><span>SBM</span> Bear Trap Map</h1>
+    <p>Kingdom #1130. Marked spots from the ksmapper plan, checked against where towns actually are on MightPulse. Refreshed every night.</p>
+  </header>
+  <div class="bar">
+    <div class="stats" id="stats"></div>
+    <span class="spacer"></span>
+    <button id="btnSize" type="button">Actual size</button>
+    <button id="btnPng" class="primary" type="button">Download PNG</button>
+  </div>
+  <div id="note" hidden></div>
+  <div class="stage" id="stage"><img id="preview" alt="SBM bear trap map"></div>
+</div>
+
+<script>
+const PLAN = {
+  updated: "2026-11-11T15:24:29Z",
+  csv: `hq,721,759,SBM,#ff8000,10376
+beartrap,712,764,BT2,#c0392b,10378
+city,711,767,SBM,#4a9edd,10388
+city,713,767,SBM,#4a9edd,10389
+city,715,766,SBM,#4a9edd,10390
+city,715,764,SBM,#4a9edd,10391
+city,714,762,SBM,#4a9edd,10392
+city,710,765,SBM,#4a9edd,10393
+city,710,763,SBM,#4a9edd,10394
+city,712,762,SBM,#4a9edd,10395
+city,709,767,SBM,#4a9edd,10396
+city,710,761,SBM,#4a9edd,10397
+city,716,762,SBM,#4a9edd,10398
+city,715,768,SBM,#4a9edd,10399
+city,717,764,SBM,#4a9edd,10400
+city,717,766,SBM,#4a9edd,10401
+city,717,768,SBM,#4a9edd,10402
+city,719,768,SBM,#4a9edd,10403
+city,719,766,SBM,#4a9edd,10404
+city,719,764,SBM,#4a9edd,10405
+city,716,760,SBM,#4a9edd,10406
+city,714,760,SBM,#4a9edd,10407
+city,712,760,SBM,#4a9edd,10408
+city,708,761,SBM,#4a9edd,10409
+city,708,763,SBM,#4a9edd,10410
+city,708,765,SBM,#4a9edd,10411
+city,706,765,SBM,#4a9edd,10412
+city,706,763,SBM,#4a9edd,10413
+city,706,761,SBM,#4a9edd,10414
+city,712,758,SBM,#4a9edd,10415
+city,714,758,SBM,#4a9edd,10416
+city,716,758,SBM,#4a9edd,10417
+city,713,769,SBM,#4a9edd,10418
+city,713,771,SBM,#4a9edd,10419
+city,711,771,SBM,#4a9edd,10420
+city,711,769,SBM,#4a9edd,10421
+city,709,769,SBM,#4a9edd,10422
+city,709,771,SBM,#4a9edd,10423
+city,707,768,SBM,#4a9edd,10424
+city,707,770,SBM,#4a9edd,10425
+city,717,770,SBM,#4a9edd,10426
+city,719,770,SBM,#4a9edd,10427
+city,718,761,SBM,#4a9edd,10428
+city,718,759,SBM,#4a9edd,10429
+city,709,759,SBM,#4a9edd,10430
+city,707,759,SBM,#4a9edd,10431
+beartrap,728,750,BT1,#c0392b,10433
+city,726,751,SBM,#4a9edd,10434
+city,724,751,SBM,#4a9edd,10435
+city,722,751,SBM,#4a9edd,10436
+city,724,749,SBM,#4a9edd,10437
+city,722,749,SBM,#4a9edd,10438
+city,726,749,SBM,#4a9edd,10439
+city,729,753,SBM,#4a9edd,10440
+city,727,753,SBM,#4a9edd,10441
+city,725,753,SBM,#4a9edd,10442
+city,725,755,SBM,#4a9edd,10443
+city,727,755,SBM,#4a9edd,10444
+city,729,755,SBM,#4a9edd,10445
+city,729,757,SBM,#4a9edd,10446
+city,727,757,SBM,#4a9edd,10447
+city,725,757,SBM,#4a9edd,10448
+city,731,750,SBM,#4a9edd,10449
+city,731,752,SBM,#4a9edd,10450
+city,731,754,SBM,#4a9edd,10451
+city,733,750,SBM,#4a9edd,10452
+city,733,752,SBM,#4a9edd,10453
+city,733,754,SBM,#4a9edd,10454
+city,735,754,SBM,#4a9edd,10455
+city,735,752,SBM,#4a9edd,10456
+city,735,750,SBM,#4a9edd,10457
+city,728,748,SBM,#4a9edd,10458
+city,730,748,SBM,#4a9edd,10459
+city,732,748,SBM,#4a9edd,10460
+city,732,746,SBM,#4a9edd,10461
+city,730,746,SBM,#4a9edd,10462
+city,728,746,SBM,#4a9edd,10463
+city,722,747,SBM,#4a9edd,10464
+city,724,747,SBM,#4a9edd,10465
+city,726,747,SBM,#4a9edd,10466
+city,728,744,SBM,#4a9edd,10467
+city,730,744,SBM,#4a9edd,10468
+city,732,744,SBM,#4a9edd,10469
+city,725,745,SBM,#4a9edd,10486
+city,723,745,SBM,#4a9edd,10487
+city,734,747,SBM,#4a9edd,10488
+city,734,745,SBM,#4a9edd,10489
+city,732,756,SBM,#4a9edd,10490
+city,734,756,SBM,#4a9edd,10491
+city,723,754,SBM,#4a9edd,10492
+city,723,756,SBM,#4a9edd,10493
+city,721,753,SBM,#4a9edd,10498
+city,721,755,SBM,#4a9edd,10499
+city,731,758,SBM,#4a9edd,10500
+city,733,758,SBM,#4a9edd,10501
+city,736,748,SBM,#4a9edd,10502
+city,726,743,SBM,#4a9edd,10503
+city,724,743,SBM,#4a9edd,10504
+city,720,748,SBM,#4a9edd,10505
+city,720,746,SBM,#4a9edd,10506
+city,731,742,SBM,#4a9edd,10507
+city,733,742,SBM,#4a9edd,10508
+city,735,743,SBM,#4a9edd,10509
+city,737,757,SBM,#4a9edd,10510
+city,737,755,SBM,#4a9edd,10511
+city,737,753,SBM,#4a9edd,10512
+city,721,744,SBM,#4a9edd,10513
+city,729,759,SBM,#4a9edd,10515
+city,727,759,SBM,#4a9edd,10516
+city,725,759,SBM,#4a9edd,17203
+hq,730,770,HAT,#8e44ad,17220
+obs2,716,754,Statue,#222222,17270
+beartrap,734,770,HAT,#c0392b,17300
+beartrap,730,774,HAT,#c0392b,17301
+obs3,726,763,SBM,#222222,17353
+obs2,722,766,SBM,#222222,17364
+obs2,722,763,SBM,#222222,17365
+city,735,758,SBM,#4a9edd,17368`
+};
+
+/* MightPulse snapshot: x,y,alliance,name — towns around the SBM hive plus every SBM member. */
+const LIVE = {
+  at: 1794410561,
+  csv: `733,752,SBM,Lord Jones
+731,746,SBM,Rampage1/1/2
+735,752,SBM,Warlord Raptor
+717,759,SBM,BabyPsychoBear
+721,757,SBM,The Doctor
+753,737,Ffs,Sdume
+726,747,SBM,Mad Madam MiM
+757,738,Ffs,Looper
+760,744,Ffs,Chérie
+755,734,Ffs,Elithium
+668,743,SBM,CptnKush
+729,746,SBM,The Meat Slapper
+753,735,Ffs,Kratos_68
+755,738,Ffs,Athy
+731,742,SBM,BOMBAOGRIAN
+760,742,Ffs,Raggy Boombastic
+756,744,Ffs,Griffles
+729,753,SBM,ẄĔĮṚÐØ ŴĮŦČ̣Ĥ
+738,749,SBM,Queen تماره
+719,760,SBM,Rampage2|1/2
+1107,95,SBM,Siyourin
+735,744,SBM,Say My Name
+758,731,Ffs,DtzyStr756
+721,762,SBM,Rampage2
+756,746,Ffs,Muzzy
+713,760,SBM,TequilaTalk
+309,360,SBM,Ponyngu
+313,739,SBM,Josef
+712,762,SBM,Tahitian Meat
+713,767,SBM,ŁĮŦŦŁË ŴĮŦČ̣Ĥ
+732,756,SBM,baby bu
+729,757,SBM,MűŕđëŕĆĥîćķèñĴŕ
+432,218,SBM,lord167055476
+715,766,SBM,TrysHard
+760,731,Ffs,KingTazi
+760,740,Ffs,Blake
+756,740,Ffs,AloneKiller
+758,744,Ffs,bEEbEE
+710,763,SBM,Lady Amethyst
+735,750,SBM,Farm DanyLotbrok
+711,767,SBM,Diet Napalm
+733,750,SBM,Hosam
+597,204,SBM,Queen Chunch
+311,740,SBM,Zlatan
+310,733,SBM,iam ali
+962,804,SBM,lord164647681
+734,747,SBM,DieTryn
+724,748,SBM,Lord Alastor
+729,742,SBM,Aako
+756,742,Ffs,Garret
+719,758,SBM,HeidiNSeek
+758,742,Ffs,Edster
+731,752,SBM,SHEIK QUACKSALOT
+758,740,Ffs,༒Empress£ilith༒
+729,755,SBM,MŮṚÐËṚÇḤỊĆĶËN̈
+727,753,SBM,ÉL ŘĔŶ ØĞŘØ
+759,733,Ffs,Arokh
+757,734,Ffs,Echo
+731,758,SBM,Treasure
+732,744,SBM,Karo 2
+759,735,Ffs,~PrincessPeach~
+731,754,SBM,Napalm
+757,736,Ffs,Wasp
+755,736,Ffs,Uncle Splinter
+756,732,Ffs,Zawisza Czarny
+732,748,SBM,Queen تماره 7`
+};
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
+const fmtUtc = ms => new Date(ms).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC";
+const fmtDay = ms => new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+
+/* ---------- parsing ---------- */
+function parsePlan(csv) {
+  const out = [];
+  for (let line of csv.split(/\r?\n/)) {
+    line = line.trim();
+    if (!line || line.startsWith("#")) continue;
+    const p = line.split(",");
+    if (p.length < 3) continue;
+    const type = p[0].trim().toLowerCase();
+    const x = parseInt(p[1], 10), y = parseInt(p[2], 10);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    out.push({ type, x, y, label: (p[3] || "").trim().replace(/\|/g, ","), color: (p[4] || "").trim() });
+  }
+  return out;
+}
+function parseLive(text) {
+  const cities = [];
+  for (const line of text.trim().split(/\r?\n/)) {
+    const p = line.split(",");
+    if (p.length < 4) continue;
+    const x = parseInt(p[0], 10), y = parseInt(p[1], 10);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    cities.push({ x, y, abbr: p[2].trim(), name: p.slice(3).join(",").trim().replace(/\|/g, ",") });
+  }
+  return { cities, at: null };
+}
+
+/* ---------- model ---------- */
+const norm = s => (s || "").replace(/\s+/g, "").toUpperCase();
+const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+const tCenter = t => [t.x + 1.5, t.y + 1.5];
+const cCenter = c => [c.x + 1, c.y + 1];
+const overlaps = (a, b) => Math.abs(a.x - b.x) < 2 && Math.abs(a.y - b.y) < 2;
+function gapTo(c, t) {
+  const gx = Math.max(0, c.x - (t.x + 3), t.x - (c.x + 2));
+  const gy = Math.max(0, c.y - (t.y + 3), t.y - (c.y + 2));
+  return Math.max(gx, gy);
+}
+
+// No assigned spots: any marked spot holding a member of the alliance exactly is correct.
+// Every other town touching a marked spot blocks it; every member not exactly on a spot is listed.
+function buildModel(planCsv, live, o) {
+  const rows = parsePlan(planCsv);
+  if (!rows.length) return { error: "The saved plan is empty." };
+  const traps = rows.filter(r => r.type === "beartrap");
+  const k1 = norm(o.key1), k2 = norm(o.key2);
+  const b1 = traps.find(t => norm(t.label).includes(k1));
+  const b2 = traps.find(t => norm(t.label).includes(k2) && t !== b1);
+  if (!b1 || !b2) return { error: `No bear traps labelled ${o.key1} and ${o.key2} in the plan.` };
+  const nearTraps = r => Math.min(Math.hypot(r.x - b1.x, r.y - b1.y), Math.hypot(r.x - b2.x, r.y - b2.y));
+  const hq = rows.filter(r => r.type === "hq" && norm(r.label) === norm(o.tag)).sort((a, b) => nearTraps(a) - nearTraps(b)).find(r => nearTraps(r) <= o.radius * 2) || null;
+  const dist = (c, t) => Math.hypot(cCenter(c)[0] - tCenter(t)[0], cCenter(c)[1] - tCenter(t)[1]);
+  const cities = rows.filter(r => r.type === "city").map(c => {
+    const g = Math.min(gapTo(c, b1), gapTo(c, b2));
+    return { ...c, d: Math.min(dist(c, b1), dist(c, b2)), ring: g === 0 ? 1 : g <= 2 ? 2 : 3 };
+  }).filter(c => c.d <= o.radius);
+
+  const towns = live.cities;
+  const correct = new Set();
+  for (const c of cities) {
+    c.found = towns.find(l => l.abbr === o.tag && l.x === c.x && l.y === c.y) || null;
+    if (c.found) correct.add(c.found);
+  }
+  const blockers = new Set();
+  for (const c of cities) {
+    const others = towns.filter(l => overlaps(l, c) && l !== c.found);
+    others.filter(l => !correct.has(l)).forEach(l => blockers.add(l));
+    c.detail = "";
+    if (c.found) c.status = "in";
+    else if (others.length) { c.status = "taken"; c.detail = others[0].name + (others.length > 1 ? ` +${others.length - 1}` : ""); }
+    else c.status = "free";
+  }
+  const placed = cities.filter(c => c.found).map(c => ({ ...c.found, ring: c.ring })).sort(byName);
+  const notPlaced = towns.filter(l => blockers.has(l) || (l.abbr === o.tag && !correct.has(l)))
+    .map(l => ({ ...l, blocking: blockers.has(l) })).sort(byName);
+  return { b1, b2, hq, cities, placed, notPlaced };
+}
+
+/* ---------- drawing ---------- */
+const PNG = {
+  page: "#0f1a17", ground: "#142722", grid: "rgba(170,210,190,0.08)", edge: "rgba(170,210,190,0.26)",
+  ring1: "#4a9e6e", ring2: "#2e7151", ring3: "#1d4434", cityEdge: "rgba(200,240,215,0.45)",
+  soft1: "rgba(74,158,110,0.20)", soft2: "rgba(46,113,81,0.24)", soft3: "rgba(29,68,52,0.34)",
+  ink: "#f3f6f1", coord: "#d3efdf",
+  empty: "rgba(170,210,190,0.07)", emptyEdge: "rgba(170,210,190,0.38)", emptyInk: "rgba(205,228,216,0.72)",
+  trap: "#a8322a", trapEdge: "#ec7a62", hq: "#5a478f", hqEdge: "#b6a4e6",
+  gold: "#e3b84a", muted: "#93a99f", rule: "rgba(170,210,190,0.18)", block: "#ff9a3c"
+};
+const STATUS = {
+  in:    { col: "#7fd6a2", label: "Correctly placed" },
+  taken: { col: "#ff9a3c", label: "Blocked spot" },
+  free:  { col: "rgba(205,228,216,0.72)", label: "Free spot" }
+};
+const F = { display: '"Chakra Petch", "Segoe UI", sans-serif', body: '"IBM Plex Sans", "Segoe UI", "Noto Sans Arabic", "Noto Sans SC", "Noto Sans TC", "Noto Sans JP", "Noto Sans KR", "Noto Sans CJK SC", "Microsoft YaHei", "Malgun Gothic", "Noto Sans Hebrew", "Noto Sans Thai", "Noto Sans Devanagari", "Noto Serif Tibetan", "Noto Sans Symbols", "Noto Sans Symbols 2", "Segoe UI Symbol", "Noto Emoji", "Segoe UI Emoji", sans-serif', mono: '"IBM Plex Mono", Consolas, monospace' };
+
+function fit(ctx, text, maxW, weight, size, minSize, family) {
+  for (let s = size; s >= minSize; s -= 0.5) { ctx.font = `${weight} ${s}px ${family}`; if (ctx.measureText(text).width <= maxW) return text; }
+  ctx.font = `${weight} ${minSize}px ${family}`;
+  let t = text;
+  while (t.length > 1 && ctx.measureText(t + "…").width > maxW) t = t.slice(0, -1);
+  return t + "…";
+}
+function poly(ctx, pts) { ctx.beginPath(); ctx.moveTo(...pts[0]); for (let i = 1; i < pts.length; i++) ctx.lineTo(...pts[i]); ctx.closePath(); }
+function rrect(ctx, x, y, w, h, r) { ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(x, y, w, h, r); else ctx.rect(x, y, w, h); }
+
+function draw(m, o) {
+  const S = 96, H = S / 2;
+  const iso = (gx, gy) => [(gx - gy) * H, -(gx + gy) * H];
+  const shown = m.cities;
+  const big = [[m.b1, 3], [m.b2, 3], ...(m.hq ? [[m.hq, 3]] : [])];
+  const boxes = [...shown.map(c => [c.x, c.y, 2]), ...big.map(([r, s]) => [r.x, r.y, s])];
+  const corners = boxes.flatMap(([x, y, s]) => [[x, y], [x + s, y], [x + s, y + s], [x, y + s]]).map(p => iso(...p));
+  const ixMin = Math.min(...corners.map(c => c[0])) - S, ixMax = Math.max(...corners.map(c => c[0])) + S;
+  const iyMin = Math.min(...corners.map(c => c[1])) - S, iyMax = Math.max(...corners.map(c => c[1])) + S;
+  const pad = 56, headH = 250, mapW = ixMax - ixMin, mapH = iyMax - iyMin;
+  const W = Math.round(Math.max(mapW + 2 * pad, 1500));
+  const ox = (W - mapW) / 2 - ixMin, oy = headH + pad - iyMin;
+  const P = (gx, gy) => { const [x, y] = iso(gx, gy); return [x + ox, y + oy]; };
+
+  const count = k => shown.filter(c => c.status === k).length;
+  const colW = 360, rowH = 34;
+  const cols = Math.max(1, Math.floor((W - 2 * pad) / colW));
+  const list = m.placed, rows = Math.ceil(list.length / cols);
+  const rosterH = list.length ? 76 + rows * rowH + 16 : 0;
+  const un = m.notPlaced, uRows = Math.ceil(un.length / cols);
+  const unH = un.length ? 76 + uRows * rowH + 52 : 0;
+  const footH = 60;
+  const Hc = Math.round(headH + mapH + 2 * pad + rosterH + unH + footH);
+
+  const cv = document.createElement("canvas");
+  cv.width = W; cv.height = Hc;
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = PNG.page; ctx.fillRect(0, 0, W, Hc);
+
+  // header
+  ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+  ctx.fillStyle = PNG.gold; ctx.font = `700 64px ${F.display}`;
+  ctx.fillText(o.tag, pad, 86);
+  const tagW = ctx.measureText(o.tag).width;
+  ctx.fillStyle = PNG.ink; ctx.font = `600 34px ${F.display}`;
+  ctx.fillText(`Bear Trap positions${o.kd ? "  ·  Kingdom " + o.kd : ""}`, pad + tagW + 22, 84);
+  ctx.fillStyle = PNG.muted; ctx.font = `500 22px ${F.body}`;
+  ctx.fillText(`${shown.length} marked spots  ·  ${count("in")} correctly placed  ·  ${count("taken")} blocked  ·  ${count("free")} free  ·  plan of ${o.planDate}  ·  updated ${o.updated || fmtUtc(Date.now())}`, pad, 126);
+  ctx.textAlign = "right";
+  let rx = W - pad;
+  [["BT2", m.b2], ["BT1", m.b1]].forEach(([k]) => {
+    ctx.font = `700 26px ${F.display}`;
+    const w = ctx.measureText(k).width + 36;
+    ctx.fillStyle = PNG.trap; rrect(ctx, rx - w, 50, w, 46, 8); ctx.fill();
+    ctx.fillStyle = PNG.ink; ctx.fillText(k, rx - 18, 82);
+    rx -= w + 14;
+  });
+
+  // legend
+  ctx.textAlign = "left";
+  const legendY = 176;
+  let lx = pad;
+  const swatch = (fill, stroke, dashed, label) => {
+    const r = 13, cx = lx + r, cy = legendY - 7;
+    poly(ctx, [[cx, cy - r], [cx + r, cy], [cx, cy + r], [cx - r, cy]]);
+    ctx.fillStyle = fill; ctx.fill();
+    if (stroke) { ctx.lineWidth = 3; ctx.strokeStyle = stroke; if (dashed) ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]); }
+    ctx.fillStyle = PNG.ink; ctx.font = `500 20px ${F.body}`;
+    ctx.fillText(label, lx + 2 * r + 10, legendY);
+    lx += 2 * r + 10 + ctx.measureText(label).width + 30;
+  };
+  swatch(PNG.ring1, null, false, "Row 1");
+  swatch(PNG.ring2, null, false, "Row 2");
+  swatch(PNG.ring3, null, false, "Further out");
+  lx += 20;
+  if (count("taken")) swatch(PNG.empty, STATUS.taken.col, true, STATUS.taken.label);
+  if (count("free")) swatch(PNG.empty, STATUS.free.col, true, STATUS.free.label);
+  ctx.fillStyle = PNG.muted; ctx.font = `400 18px ${F.body}`;
+  ctx.fillText(`Positions checked against MightPulse map data from ${o.liveDate}. Green spots hold an ${o.tag} city; orange spots are blocked by a city that isn't placed on a marked spot.`, pad, legendY + 42);
+  ctx.strokeStyle = PNG.rule; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(pad, headH - 12); ctx.lineTo(W - pad, headH - 12); ctx.stroke();
+
+  // ground + grid, clipped to the map rectangle
+  const mx0 = ixMin + ox, my0 = iyMin + oy;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(mx0, my0, mapW, mapH); ctx.fillStyle = PNG.ground; ctx.fill(); ctx.clip();
+  const toGrid = (x, y) => [((x - ox) / H - (y - oy) / H) / 2, (-(y - oy) / H - (x - ox) / H) / 2];
+  const rc = [[mx0, my0], [mx0 + mapW, my0], [mx0 + mapW, my0 + mapH], [mx0, my0 + mapH]].map(p => toGrid(...p));
+  const gx0 = Math.floor(Math.min(...rc.map(r => r[0]))), gx1 = Math.ceil(Math.max(...rc.map(r => r[0])));
+  const gy0 = Math.floor(Math.min(...rc.map(r => r[1]))), gy1 = Math.ceil(Math.max(...rc.map(r => r[1])));
+  ctx.strokeStyle = PNG.grid; ctx.lineWidth = 1;
+  ctx.beginPath();
+  for (let gx = gx0; gx <= gx1; gx++) { ctx.moveTo(...P(gx, gy0)); ctx.lineTo(...P(gx, gy1)); }
+  for (let gy = gy0; gy <= gy1; gy++) { ctx.moveTo(...P(gx0, gy)); ctx.lineTo(...P(gx1, gy)); }
+  ctx.stroke();
+  ctx.restore();
+  ctx.strokeStyle = PNG.edge; ctx.lineWidth = 2; ctx.strokeRect(mx0, my0, mapW, mapH);
+
+  // axis key, bottom-left corner of the map
+  {
+    const cx = mx0 + 80, cy = my0 + mapH - 30, L = 54;
+    ctx.lineWidth = 3; ctx.strokeStyle = PNG.gold; ctx.fillStyle = PNG.gold;
+    const arrow = (dx, dy, label, ax) => {
+      const ex = cx + dx * L, ey = cy + dy * L;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke();
+      const a = Math.atan2(dy, dx);
+      ctx.beginPath(); ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - 13 * Math.cos(a - 0.45), ey - 13 * Math.sin(a - 0.45));
+      ctx.lineTo(ex - 13 * Math.cos(a + 0.45), ey - 13 * Math.sin(a + 0.45)); ctx.closePath(); ctx.fill();
+      ctx.font = `700 22px ${F.mono}`; ctx.textAlign = ax; ctx.fillText(label, ex + dx * 14, ey + dy * 14 + 4);
+    };
+    arrow(Math.SQRT1_2, -Math.SQRT1_2, "X+", "left");
+    arrow(-Math.SQRT1_2, -Math.SQRT1_2, "Y+", "right");
+    ctx.textAlign = "left";
+  }
+
+  // spots
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const maxW = S * 1.45;
+  for (const c of shown) {
+    const pts = [P(c.x, c.y), P(c.x + 2, c.y), P(c.x + 2, c.y + 2), P(c.x, c.y + 2)];
+    const [cx, cy] = P(c.x + 1, c.y + 1);
+    const st = STATUS[c.status];
+    const filled = c.status === "in";
+    poly(ctx, pts);
+    if (!filled) {
+      ctx.fillStyle = c.ring === 1 ? PNG.soft1 : c.ring === 2 ? PNG.soft2 : PNG.soft3; ctx.fill();
+      ctx.setLineDash([6, 5]); ctx.lineWidth = c.status === "taken" ? 3 : 1.5;
+      ctx.strokeStyle = c.status === "taken" ? st.col : PNG.emptyEdge; ctx.stroke(); ctx.setLineDash([]);
+    } else {
+      ctx.fillStyle = c.ring === 1 ? PNG.ring1 : c.ring === 2 ? PNG.ring2 : PNG.ring3; ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = PNG.cityEdge; ctx.stroke();
+    }
+    const lines = [];
+    const ink = filled ? PNG.ink : PNG.emptyInk, sub = filled ? PNG.coord : PNG.emptyInk;
+    lines.push({ t: filled ? c.found.name : (c.status === "taken" ? "blocked" : "free"), w: 600, s: 17, min: 10.5, f: F.body, col: c.status === "taken" ? st.col : ink });
+    lines.push({ t: `${c.x} : ${c.y}`, w: 600, s: 15, min: 12, f: F.mono, col: sub });
+    if (c.detail) lines.push({ t: c.detail, w: 600, s: 12.5, min: 10, f: F.body, col: st.col });
+    const gap = 3, total = lines.reduce((a, l) => a + l.s, 0) + gap * (lines.length - 1);
+    let y = cy - total / 2;
+    for (const l of lines) {
+      const t = fit(ctx, l.t, maxW, l.w, l.s, l.min, l.f);
+      ctx.fillStyle = l.col; ctx.fillText(t, cx, y + l.s / 2);
+      y += l.s + gap;
+    }
+  }
+
+  // traps and HQ on top
+  const structure = (r, size, fill, edge, title) => {
+    const pts = [P(r.x, r.y), P(r.x + size, r.y), P(r.x + size, r.y + size), P(r.x, r.y + size)];
+    const [cx, cy] = P(r.x + size / 2, r.y + size / 2);
+    poly(ctx, pts); ctx.fillStyle = fill; ctx.fill();
+    ctx.strokeStyle = edge; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = PNG.ink; ctx.font = `700 40px ${F.display}`; ctx.fillText(title, cx, cy - 10);
+    ctx.fillStyle = "rgba(255,235,228,0.9)"; ctx.font = `600 16px ${F.mono}`; ctx.fillText(`${r.x} : ${r.y}`, cx, cy + 24);
+  };
+  if (m.hq) structure(m.hq, 3, PNG.hq, PNG.hqEdge, "HQ");
+  structure(m.b1, 3, PNG.trap, PNG.trapEdge, "BT1");
+  structure(m.b2, 3, PNG.trap, PNG.trapEdge, "BT2");
+
+  // name lists
+  const section = (y0, title, items, nRows, colour, label, dot) => {
+    ctx.strokeStyle = PNG.rule; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(pad, y0); ctx.lineTo(W - pad, y0); ctx.stroke();
+    ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = PNG.ink; ctx.font = `600 28px ${F.display}`; ctx.fillText(title, pad, y0 + 48);
+    const top = y0 + 76, cw = (W - 2 * pad) / cols;
+    items.forEach((u, i) => {
+      const col = Math.floor(i / nRows), row = i % nRows;
+      const x = pad + col * cw, y = top + row * rowH + 22;
+      const coord = `${u.x} : ${u.y}`;
+      ctx.font = `600 18px ${F.mono}`;
+      const cwid = ctx.measureText(coord).width;
+      ctx.fillStyle = colour(u); ctx.textAlign = "right"; ctx.fillText(coord, x + cw - 24, y);
+      let nx = x;
+      if (dot) {
+        ctx.beginPath(); ctx.arc(x + 12, y - 6, 12, 0, Math.PI * 2);
+        ctx.fillStyle = dot(u); ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = PNG.cityEdge; ctx.stroke();
+        ctx.fillStyle = PNG.ink; ctx.font = `700 15px ${F.mono}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(String(u.ring), x + 12, y - 5); ctx.textBaseline = "alphabetic";
+        nx = x + 34;
+      }
+      ctx.textAlign = "left"; ctx.fillStyle = PNG.ink;
+      ctx.fillText(fit(ctx, label(u), cw - cwid - 44 - (nx - x), 500, 18, 13, F.body), nx, y);
+    });
+    return top + nRows * rowH;
+  };
+  let y0 = headH + mapH + 2 * pad + 10;
+  if (list.length) { section(y0, "Players A–Z", list, rows, () => PNG.gold, u => u.name, u => u.ring === 1 ? PNG.ring1 : u.ring === 2 ? PNG.ring2 : PNG.ring3); y0 += rosterH; }
+  if (un.length) {
+    const end = section(y0, "Members not correctly placed", un, uRows,
+      u => u.blocking ? PNG.block : PNG.muted, u => (u.abbr !== o.tag ? `[${u.abbr || "no alliance"}] ` : "") + u.name);
+    ctx.fillStyle = PNG.muted; ctx.font = `400 17px ${F.body}`; ctx.textAlign = "left";
+    ctx.fillText(`Current position shown. Orange: blocking a marked spot. Grey: ${o.tag} member not on a marked spot.`, pad, end + 30);
+  }
+
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.fillStyle = PNG.muted; ctx.font = `400 17px ${F.body}`;
+  ctx.fillText("Row 1 touches a bear trap, row 2 is one city further out. Coordinates are X : Y.", pad, Hc - 24);
+  return cv;
+}
+
+/* ---------- page state ---------- */
+const O = { tag: "SBM", kd: "#1130", key1: "BT1", key2: "BT2", radius: 18 };
+let canvas = null, imgUrl = null;
+function setNote(kind, html) { const n = $("note"); if (!html) { n.hidden = true; return; } n.className = "msg " + kind; n.innerHTML = html; n.hidden = false; }
+
+function render() {
+  const live = { ...parseLive(LIVE.csv), at: LIVE.at * 1000 };
+  const o = { ...O, planDate: fmtDay(Date.parse(PLAN.updated)), updated: fmtUtc(Date.parse(PLAN.updated)), liveDate: live.at ? fmtUtc(live.at) : "an unknown date" };
+  const m = buildModel(PLAN.csv, live, o);
+  if (m.error) { setNote("err", esc(m.error)); $("btnPng").disabled = true; return; }
+  canvas = draw(m, o);
+  canvas.toBlob(b => {
+    if (!b) return;
+    if (imgUrl) URL.revokeObjectURL(imgUrl);
+    imgUrl = URL.createObjectURL(b);
+    $("preview").src = imgUrl;
+  }, "image/png");
+  const n = k => m.cities.filter(c => c.status === k).length;
+  $("stats").innerHTML = [`${n("in")} correctly placed`, `${n("taken")} blocked`, `${n("free")} free`, `${m.notPlaced.length} not correctly placed`]
+    .map(t => `<span class="chip">${esc(t)}</span>`).join("");
+}
+
+async function downloadPng() {
+  if (!canvas) return;
+  const name = `SBM-bear-traps-${new Date().toISOString().slice(0, 10)}.png`;
+  const blob = await new Promise(r => canvas.toBlob(r, "image/png"));
+  const dl = window.claude && window.claude.use ? await window.claude.use("downloads").catch(() => null) : null;
+  const fallback = "Saving isn't available in this view. Right-click the image (or long-press on a phone) and choose <strong>Save image</strong>.";
+  if (!dl) {
+    try {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      setNote("ok", `Downloaded <code>${esc(name)}</code>.`);
+    } catch (e) { setNote("ok", fallback); }
+    return;
+  }
+  try { await dl.save({ filename: name, data: blob }); setNote("ok", `Saved <code>${esc(name)}</code>.`); }
+  catch (e) {
+    if (e && e.code === "declined") return;
+    setNote("ok", fallback);
+  }
+}
+
+$("btnPng").addEventListener("click", downloadPng);
+$("btnSize").addEventListener("click", () => { const s = $("stage"); const on = s.classList.toggle("actual"); $("btnSize").textContent = on ? "Fit to width" : "Actual size"; });
+render();
+Promise.all([
+  document.fonts.load(`700 40px "Chakra Petch"`), document.fonts.load(`600 18px "IBM Plex Sans"`), document.fonts.load(`600 16px "IBM Plex Mono"`)
+].map(p => p.catch(() => null))).then(() => render());
+</script>
+
+</body></html>
