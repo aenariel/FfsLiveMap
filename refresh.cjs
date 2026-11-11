@@ -171,7 +171,10 @@ function renderMap(map, data, report) {
     const out = execFileSync(process.execPath, [
       path.join(ROOT, map.renderer), path.join(ROOT, map.template), t("plan"), t("live"), t("png"), t("page")
     ], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
-    for (const k of ["plan", "live", "png"]) fs.copyFileSync(t(k), path.join(ROOT, map.files[k]));
+    for (const k of ["plan", "live", "png"]) {
+      fs.copyFileSync(t(k), path.join(ROOT, map.files[k]));
+      fs.appendFileSync(path.join(ROOT, ".refresh-files"), map.files[k] + "\n");
+    }
     fs.mkdirSync(SITE, { recursive: true });
     fs.copyFileSync(t("page"), path.join(SITE, map.files.page));
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -201,6 +204,7 @@ function writeJobSummary(report) {
 }
 
 (async () => {
+  fs.rmSync(path.join(ROOT, ".refresh-files"), { force: true }); // list of files written by successful maps
   const report = { startedAt: new Date().toISOString(), update: NO_UPDATE ? "skipped (--no-update)" : "not attempted", maps: {}, warnings: [], failures: [] };
   try {
     if (!NO_UPDATE) {

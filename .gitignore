@@ -1,3 +1,4 @@
 node_modules/
 site_build/
 _site/
+.refresh-files

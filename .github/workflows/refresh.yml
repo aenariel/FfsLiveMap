@@ -50,16 +50,22 @@ jobs:
       - name: Commit and push
         if: always()
         run: |
+          # Only the files of maps that rendered successfully are listed in .refresh-files.
+          if [ ! -s .refresh-files ]; then echo "Nothing rendered, nothing to commit."; exit 0; fi
+          mkdir -p /tmp/out
+          while read -r f; do cp "$f" /tmp/out/; done < .refresh-files
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add ffs-bear-traps.png plan.csv live.csv sbm-bear-traps.png sbm-plan.csv sbm-live.csv
-          if git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
-          git commit -q -m "Daily refresh $(date -u +%F)"
           for i in 1 2 3; do
-            git pull -q --rebase origin "$GITHUB_REF_NAME" && git push -q origin "HEAD:$GITHUB_REF_NAME" && exit 0
+            # Start from the latest branch tip and lay the fresh files on top, so a re-run
+            # or a concurrent commit never causes a merge conflict: the newest render wins.
+            git fetch -q origin "$GITHUB_REF_NAME"
+            git reset -q --hard "origin/$GITHUB_REF_NAME"
+            cp /tmp/out/* .
+            git add $(cat .refresh-files)
+            if git diff --cached --quiet; then echo "No changes to commit."; exit 0; fi
+            git commit -q -m "Daily refresh $(date -u +%F)"
+            git push -q origin "HEAD:$GITHUB_REF_NAME" && exit 0
             sleep 10
           done
           echo "::error::Push failed"
