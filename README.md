@@ -7,7 +7,7 @@ Bear trap positions for alliances Ffs and SBM (kingdom #1130) and VAR (kingdom #
 Assigned spots come from the alliance's ksmapper plan; player positions come from MightPulse.
 Find your name, then move your city to the X : Y shown. If your spot is blocked or you have no spot, contact leadership.
 
-Files: `plan.csv` (plan as of the last refresh), `live.csv` (MightPulse positions used), `render.cjs` (renderer), `templates/ffs-page.html` (drawing code).
+Files: `plan.csv` (plan as of the last refresh, with the editor's names), `live.csv` (MightPulse positions used), `assignments/ffs.csv`, `render.cjs` (renderer), `templates/ffs-page.html` (drawing code).
 
 ## SBM
 
@@ -21,11 +21,19 @@ Files: `sbm-plan.csv`, `sbm-live.csv`, `render-sbm.cjs`, `templates/sbm-page.htm
 
 ## VAR
 
-Bear trap hive for alliance VAR, kingdom #2116 (ksmapper map `axcubtfj`). Works like SBM: no assigned spots yet.
+Bear trap hive for alliance VAR, kingdom #2116 (ksmapper map `axcubtfj`). Same format as Ffs: same renderer (`render.cjs --tag VAR --kd #2116`) and the same template (`templates/ffs-page.html`), so any format change applies to both.
 
 **Image:** [var-bear-traps.png](https://raw.githubusercontent.com/aenariel/FfsLiveMap/main/var-bear-traps.png) — refreshed with the other maps.
 
-Files: `var-plan.csv`, `var-live.csv`, `render-sbm.cjs --tag VAR --kd #2116`, `templates/var-page.html`.
+Files: `var-plan.csv`, `var-live.csv`, `assignments/var.csv`.
+
+## Hive editor (Ffs, VAR)
+
+Who goes on which spot is set in the hive editor, https://hive-editor.kstools.workers.dev (code in `worker/`, deployed by `.github/workflows/deploy-editor.yml` to Cloudflare Workers + D1). Editors sign in with a personal code; the admin adds or removes editors and chooses their maps there.
+
+- ksmapper still sets the layout: spots, traps, HQ. The names on the spots come from the editor, by spot number.
+- Each refresh saves the editor's assignments to `assignments/ffs.csv` and `assignments/var.csv`; if the editor can't be reached, the last copy is used.
+- Until a map is saved in the editor for the first time, the ksmapper labels are used (labels that are only spot numbers count as empty).
 
 ## Spot numbers
 

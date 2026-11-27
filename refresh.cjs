@@ -3,6 +3,8 @@
 // 1. Asks MightPulse for a fresh scan (one "Update Map" request) and waits for its queue.
 // 2. Reads city positions from MightPulse and each hive plan from ksmapper.
 // 3. Gives every spot its fixed number (spots/<map>.csv, see spots.cjs).
+//    Ffs and VAR: the names on the spots come from the hive editor service (assignments/<map>.csv keeps the last
+//    copy, used if the service can't be reached); until a map is first saved there, the ksmapper labels are used.
 // 4. Renders each map independently: PNG + CSVs in the repo root, interactive page in ./site.
 //
 // Usage: node refresh.cjs [--kingdom 1130[,2116]] [--no-update] [--site <dir>]
@@ -21,6 +23,7 @@ const { numberSpots } = require("./spots.cjs");
 
 const MP = "https://mightpulse.com";
 const KSMAPPER = id => `https://ksmapper.jim-harvey-yu.workers.dev/map/${id}`;
+const EDITOR = "https://hive-editor.kstools.workers.dev";
 const UA = "FfsLiveMap/1.0 (+https://github.com/aenariel/FfsLiveMap)";
 
 const POLL_SEC = 15;            // status polling interval while queued/running
@@ -30,10 +33,10 @@ const PLAN_TYPES = ["city", "beartrap", "hq", "obs1", "obs2", "obs3"];
 
 const MAPS = [
   {
-    name: "Ffs", kid: 1130, ksmapper: "981tkvsj", keys: ["BT1", "BT2", "BT3"],
-    renderer: "render.cjs",
+    name: "Ffs", kid: 1130, ksmapper: "981tkvsj", keys: ["BT1", "BT2", "BT3"], editor: "ffs",
+    renderer: "render.cjs", rendererArgs: ["--tag", "Ffs", "--kd", "#1130"],
     template: "templates/ffs-page.html",
-    files: { plan: "plan.csv", live: "live.csv", png: "ffs-bear-traps.png", page: "ffs.html", spots: "spots/ffs.csv" },
+    files: { plan: "plan.csv", live: "live.csv", png: "ffs-bear-traps.png", page: "ffs.html", spots: "spots/ffs.csv", assignments: "assignments/ffs.csv" },
     live: c => (c.x >= 730 && c.x <= 810 && c.y >= 697 && c.y <= 777) || c.alliance_abbr === "Ffs",
     plan: (x, y) => Math.abs(x - 769) <= 40 && Math.abs(y - 737) <= 40
   },
@@ -46,10 +49,11 @@ const MAPS = [
     plan: (x, y) => x >= 696 && x <= 750 && y >= 728 && y <= 786
   },
   {
-    name: "VAR", kid: 2116, ksmapper: "axcubtfj", keys: ["BT1", "BT2"],
-    renderer: "render-sbm.cjs", rendererArgs: ["--tag", "VAR", "--kd", "#2116"],
-    template: "templates/var-page.html",
-    files: { plan: "var-plan.csv", live: "var-live.csv", png: "var-bear-traps.png", page: "var.html", spots: "spots/var.csv" },
+    // Same renderer and template as Ffs: format changes always apply to both.
+    name: "VAR", kid: 2116, ksmapper: "axcubtfj", keys: ["BT1", "BT2"], editor: "var",
+    renderer: "render.cjs", rendererArgs: ["--tag", "VAR", "--kd", "#2116"],
+    template: "templates/ffs-page.html",
+    files: { plan: "var-plan.csv", live: "var-live.csv", png: "var-bear-traps.png", page: "var.html", spots: "spots/var.csv", assignments: "assignments/var.csv" },
     // Plains HQ 760,728, BT1 755,718, BT2 755,738
     live: c => (c.x >= 720 && c.x <= 800 && c.y >= 688 && c.y <= 768) || c.alliance_abbr === "VAR",
     plan: (x, y) => Math.abs(x - 760) <= 40 && Math.abs(y - 728) <= 40
@@ -171,6 +175,64 @@ async function getData(KID, maps, report) {
   return { cities: mp.cities, at, plans };
 }
 
+// ---------- 2b. Assignments from the hive editor ----------
+// Returns Map(spot number -> player), or null to keep the ksmapper labels.
+async function getAssignments(map, report, r) {
+  const file = path.join(ROOT, map.files.assignments);
+  const fromFile = why => {
+    if (!fs.existsSync(file)) {
+      report.warnings.push(`${map.name}: ${why}; no saved copy either, using the ksmapper labels`);
+      r.names = "ksmapper (editor unreachable, no copy)";
+      return null;
+    }
+    const out = new Map();
+    for (const l of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+      if (!l || l.startsWith("#")) continue;
+      const i = l.indexOf(",");
+      if (i > 0) out.set(l.slice(0, i), l.slice(i + 1));
+    }
+    report.warnings.push(`${map.name}: ${why}; using the last saved copy (${out.size} names)`);
+    r.names = `editor copy in ${map.files.assignments}`;
+    return out;
+  };
+  let res;
+  try { res = await http(`${EDITOR}/api/maps/${map.editor}`); }
+  catch (e) { return fromFile(`hive editor unreachable (${e.message.slice(0, 120)})`); }
+  if (res.status !== 200 || !Array.isArray(res.body.assignments)) return fromFile(`hive editor answered HTTP ${res.status}`);
+  if (!res.body.version) {
+    log(`${map.name}: hive editor has no saves for "${map.editor}" yet, using the ksmapper labels`);
+    r.names = "ksmapper (editor not used yet)";
+    return null;
+  }
+  const out = new Map(res.body.assignments.map(a => [a.spot, plainSpaces(a.player)]));
+  const head = `# Assignments of ${map.name} from the hive editor, v${res.body.version} (${res.body.updatedAt} by ${res.body.updatedBy}). spot,player\n`;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, head + [...out].sort((a, b) => a[0].localeCompare(b[0])).map(([k, v]) => `${k},${v}`).join("\n") + "\n");
+  fs.appendFileSync(path.join(ROOT, ".refresh-files"), map.files.assignments + "\n");
+  r.names = `hive editor v${res.body.version}`;
+  log(`${map.name}: ${out.size} names from the hive editor, v${res.body.version} (${res.body.updatedAt} by ${res.body.updatedBy})`);
+  return out;
+}
+
+// Writes the editor's names on the numbered city lines; spots without a name become "City" (empty).
+function applyAssignments(lines, names, map, report, r) {
+  const used = new Set();
+  const out = lines.map(l => {
+    const a = l.split(",");
+    const num = a[0] === "city" && a.length > 6 ? a[a.length - 1] : "";
+    if (!/^BT\d-\d{3,4}$/.test(num)) return l;
+    const p = names.get(num);
+    if (p) used.add(num);
+    a[3] = p ? p.replace(/,/g, "|") : "City";
+    return a.join(",");
+  });
+  const orphans = [...names.keys()].filter(k => !used.has(k));
+  if (orphans.length) report.warnings.push(`${map.name}: ${orphans.length} name(s) on spots no longer in the plan: ${orphans.map(k => `${k} ${names.get(k)}`).join(", ").slice(0, 300)}`);
+  r.assigned = used.size;
+  log(`${map.name}: ${used.size} spots named from the editor${orphans.length ? `, ${orphans.length} orphan(s)` : ""}`);
+  return out;
+}
+
 // ---------- 3. Render ----------
 // Palette PNG (256 colours, no dithering): about 70% smaller and visually identical for these
 // flat-colour maps. Keeps the repository history small with several refreshes a day.
@@ -201,7 +263,13 @@ async function renderMap(map, data, report) {
     log(`${map.name}: ${raw.length} plan lines, ${live.length} towns from MightPulse`);
     const spotsFile = path.join(ROOT, map.files.spots);
     const sp = numberSpots(raw, { file: spotsFile, keys: map.keys, radius: 18, log: (...a) => log(map.name + ":", ...a) });
-    const plan = sp.lines;
+    let plan = sp.lines;
+    if (map.editor) {
+      const names = await getAssignments(map, report, r);
+      if (names) plan = applyAssignments(plan, names, map, report, r);
+      // ksmapper labels that are only spot numbers (as the hive generator writes them) are not players
+      else plan = plan.map(l => { const a = l.split(","); return a[0] === "city" && /^BT\d-\d{3,4}$/i.test((a[3] || "").trim()) ? (a[3] = "City", a.join(",")) : l; });
+    }
     r.spots = { numbered: plan.filter(l => /^city,.*,[A-Z0-9]+-\d{3,4}$/i.test(l)).length, added: sp.added };
 
     // Render into a scratch folder first, so a failure never leaves half-updated files behind.

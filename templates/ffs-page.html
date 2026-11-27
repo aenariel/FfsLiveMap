@@ -859,7 +859,7 @@ function draw(m, o) {
 
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   ctx.fillStyle = PNG.muted; ctx.font = `400 17px ${F.body}`;
-  ctx.fillText("Row 1 touches a bear trap, row 2 is one city further out. Coordinates are each city's X : Y as planned in ksmapper. Spot numbers (BT1-001…) are fixed. BT3 is planned for later.", pad, Hc - 24);
+  ctx.fillText("Row 1 touches a bear trap, row 2 is one city further out. Coordinates are each city's X : Y as planned in ksmapper. Spot numbers (BT1-001…) are fixed." + (m.b3 ? " BT3 is planned for later." : ""), pad, Hc - 24);
   return cv;
 }
 
