@@ -1,0 +1,24 @@
+# Hive editor: assignments of bear trap spots for the FfsLiveMap maps.
+# Deployed by .github/workflows/deploy-editor.yml; secrets (ADMIN_CODE, GH_DISPATCH_TOKEN) are set there.
+name = "hive-editor"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hive-editor"
+database_id = "15b79762-6a6b-4822-ae86-8c7b87004ef9"
+migrations_dir = "migrations"
+
+[vars]
+MAPS = "ffs,var"
+DAILY_LIMIT = "50"
+ADMIN_NAME = "Admin"
+GH_REPO = "aenariel/FfsLiveMap"
+GH_WORKFLOW = "refresh.yml"

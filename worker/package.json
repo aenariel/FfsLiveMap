@@ -1,0 +1,12 @@
+{
+  "name": "hive-editor",
+  "private": true,
+  "description": "Cloudflare Worker + D1 behind the bear trap map editor",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "node test/api.test.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "4.169.0"
+  }
+}
