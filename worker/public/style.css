@@ -37,6 +37,13 @@ input:focus { outline: none; border-color: var(--gold); }
   body.hasSel { padding-bottom: 48vh; }
 }
 .closeSel { margin-left: auto; }
+/* signed out: only the sign-in card */
+body.signedOut .mapcol, body.signedOut .side > .card:not(#cardSignin), body.signedOut #mapTabs { display: none !important; }
+body.signedOut .layout { grid-template-columns: minmax(0, 420px); justify-content: center; }
+.mapName { font-weight: 600; }
+ul.suggest { list-style: none; margin: 0 0 6px; padding: 4px 0; max-height: 230px; overflow: auto; background: #0c1512; border: 1px solid var(--line); border-radius: 7px; }
+ul.suggest li { padding: 6px 10px; cursor: pointer; display: flex; justify-content: space-between; gap: 10px; }
+ul.suggest li:hover { background: var(--surface2); }
 
 .mapcol { position: sticky; top: 8px; }
 @media (max-width: 900px) { .mapcol { position: static; } }

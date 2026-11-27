@@ -89,6 +89,7 @@ function parseLive(text) {
 }
 
 async function loadMap(id) {
+  if (!myMaps().includes(id)) { log(`map ${id} not allowed for this code`); return; }
   const cfg = MAPS[id];
   const t0 = performance.now();
   setStatus(`Loading ${cfg.label}…`);
@@ -249,8 +250,13 @@ function spotAt(px, py) {
 /* ---------------- panels ---------------- */
 function setStatus(text, cls) { const el = $("status"); el.textContent = text; el.className = "status " + (cls || ""); }
 
+const myMaps = () => S.me ? S.me.maps.filter(id => MAPS[id]) : [];
 function renderTabs() {
-  $("mapTabs").innerHTML = Object.entries(MAPS).map(([id, m]) => `<button data-map="${id}" class="${id === S.mapId ? "on" : ""}">${esc(m.label)} <span class="muted small">${esc(m.kd)}</span></button>`).join("");
+  const ids = myMaps();
+  document.body.classList.toggle("signedOut", !S.me);
+  $("mapTabs").innerHTML = ids.length > 1
+    ? ids.map(id => `<button data-map="${id}" class="${id === S.mapId ? "on" : ""}">${esc(MAPS[id].label)} <span class="muted small">${esc(MAPS[id].kd)}</span></button>`).join("")
+    : ids.length === 1 ? `<span class="mapName">${esc(MAPS[ids[0]].label)} <span class="muted small">${esc(MAPS[ids[0]].kd)}</span></span>` : "";
 }
 function renderWho() {
   $("who").textContent = S.me ? `${S.me.name}${S.me.admin ? " (admin)" : ""}` : "Not signed in";
@@ -278,7 +284,6 @@ function renderSpot() {
   if (!num) { body.innerHTML = `<p class="muted">Tap a spot on the map or in the list.</p>`; return; }
   const s = S.layout.byNum.get(num);
   const st = statusOf(s), name = effective(num), was = saved(num), srv = S.server.map.get(num);
-  const members = S.live.cities.filter(c => c.abbr === MAPS[S.mapId].tag).map(c => c.name).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   const where = st.me && !(st.me.x === s.x && st.me.y === s.y) ? ` (city now at ${st.me.x}:${st.me.y})` : "";
   const onIt = st.occ.filter(c => !st.me || c !== st.me).map(c => `${c.abbr ? "[" + c.abbr + "] " : ""}${c.name} ${c.x}:${c.y}`);
   body.innerHTML = `
@@ -291,10 +296,10 @@ function renderSpot() {
     </div>
     ${canEdit() ? `
     <form id="assignForm" class="row">
-      <input id="assignName" list="memberList" placeholder="Player name" autocomplete="off" value="${esc(name)}">
-      <datalist id="memberList">${members.map(n => `<option value="${esc(n)}">`).join("")}</datalist>
+      <input id="assignName" placeholder="Type or pick a player" autocomplete="off" spellcheck="false">
       <button type="submit">Set</button>
     </form>
+    <ul class="suggest" id="suggest" hidden></ul>
     <div class="row">
       <button id="clearBtn" ${name ? "" : "disabled"}>Clear</button>
       <button id="swapBtn" class="${S.swapFrom === num ? "on" : ""}">${S.swapFrom === num ? "Tap the other spot…" : "Swap with…"}</button>
@@ -303,15 +308,43 @@ function renderSpot() {
     <div id="assignMsg" class="small"></div>` : `<p class="muted small">${S.me ? "Your code can't edit this map." : "Sign in to edit."}</p>`}`;
   $("closeSel").onclick = () => select(null);
   if (!canEdit()) return;
-  $("assignForm").onsubmit = e => {
-    e.preventDefault();
-    const v = $("assignName").value.trim();
+  const put = v => {
+    v = v.trim();
+    if (!v) return;
     const from = assign(num, v);
     if (from) $("assignMsg").innerHTML = `<span class="gold">${esc(v)} moved here from ${esc(from)}, which is now free.</span>`;
   };
+  $("assignForm").onsubmit = e => { e.preventDefault(); put($("assignName").value); };
+  // Own suggestion list (a <datalist> hides everything that doesn't match the text already in the box).
+  const showSuggest = () => {
+    const q = fold($("assignName").value);
+    const list = suggestions().filter(m => !q || fold(m.name).includes(q)).slice(0, 300);
+    const ul = $("suggest");
+    ul.innerHTML = list.map(m => `<li data-name="${esc(m.name)}">${esc(m.name)} <span class="small ${m.spot ? "muted" : "ok"}">${m.spot ? esc(m.spot) : "no spot"}</span></li>`).join("")
+      || `<li class="muted">No member matches. Press Set to use the name as typed.</li>`;
+    ul.hidden = false;
+  };
+  $("assignName").onfocus = showSuggest;
+  $("assignName").oninput = showSuggest;
+  $("assignName").onblur = () => setTimeout(() => { if ($("suggest")) $("suggest").hidden = true; }, 150);
+  $("suggest").onmousedown = e => e.preventDefault(); // keep the focus so the tap lands
+  $("suggest").onclick = e => { const li = e.target.closest("li[data-name]"); if (li) put(li.dataset.name); };
   $("clearBtn").onclick = () => assign(num, "");
   $("swapBtn").onclick = () => { S.swapFrom = S.swapFrom === num ? null : num; renderAll(); };
   if ($("undoBtn")) $("undoBtn").onclick = () => { S.pending.delete(num); S.pendingBase.delete(num); S.conflicts.delete(num); renderAll(); };
+}
+// Alliance members for the picker: those without a spot first, then the rest with the spot they hold.
+function suggestions() {
+  const tag = MAPS[S.mapId].tag, spotOf = new Map();
+  for (const s of S.layout.spots) { const n = effective(s.num); if (n) spotOf.set(fold(n), s.num); }
+  const by = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+  const seen = new Set(), all = [];
+  for (const c of S.live.cities) {
+    if (c.abbr !== tag || seen.has(fold(c.name))) continue;
+    seen.add(fold(c.name));
+    all.push({ name: c.name, spot: spotOf.get(fold(c.name)) || "" });
+  }
+  return [...all.filter(m => !m.spot).sort(by), ...all.filter(m => m.spot).sort(by)];
 }
 function renderPending() {
   const items = [...S.pending.entries()].sort((a, b) => a[0].localeCompare(b[0]));
@@ -407,7 +440,12 @@ async function signIn(code) {
   }
   S.me = r.data; localStorage.setItem(CODE_KEY, S.code);
   log(`signed in as ${S.me.name}, maps ${S.me.maps.join(",")}${S.me.admin ? ", admin" : ""}`);
-  renderAll(); loadHistory(); loadEditors();
+  const ids = myMaps();
+  if (!ids.length) { renderAll(); $("signinInfo").innerHTML += ` <span class="warn">No map is assigned to this code yet.</span>`; return; }
+  const want = (location.hash || "").slice(1), last = localStorage.getItem(MAP_KEY);
+  const id = ids.includes(want) ? want : ids.includes(last) ? last : ids[0];
+  renderAll(); loadEditors();
+  if (id !== S.mapId || !S.layout) await loadMap(id); else { renderAll(); loadHistory(); }
 }
 async function submit() {
   const changes = [...S.pending.entries()].map(([spot, player]) => ({ spot, player }));
@@ -474,7 +512,12 @@ function wire() {
   $("submitBtn").onclick = submit;
   $("discardBtn").onclick = () => { if (confirm("Discard all changes you haven't saved?")) { S.pending.clear(); S.pendingBase.clear(); S.conflicts.clear(); renderAll(); } };
   $("signinForm").onsubmit = e => { e.preventDefault(); signIn($("codeInput").value); };
-  $("signOut").onclick = () => { S.me = null; S.code = ""; localStorage.removeItem(CODE_KEY); $("codeInput").value = ""; renderAll(); loadHistory(); };
+  $("signOut").onclick = () => {
+    if (S.pending.size && !confirm("Discard the changes you haven't saved?")) return;
+    S.me = null; S.code = ""; localStorage.removeItem(CODE_KEY); $("codeInput").value = "";
+    S.mapId = null; S.layout = null; S.pending.clear(); S.pendingBase.clear(); S.conflicts.clear(); S.selected = null;
+    document.body.classList.remove("hasSel"); renderAll(); log("signed out");
+  };
   const zoomTo = h => { S.zoom = h; localStorage.setItem(ZOOM_KEY + "-" + S.mapId, String(h || "")); drawMap(); };
   $("zoomIn").onclick = () => zoomTo((S.geo ? S.geo.H : 20) * 1.25);
   $("zoomOut").onclick = () => zoomTo(Math.max(8, (S.geo ? S.geo.H : 20) / 1.25));
@@ -525,9 +568,6 @@ function wire() {
 
 (async function start() {
   wire();
-  const want = (location.hash || "").slice(1);
-  const id = MAPS[want] ? want : (MAPS[localStorage.getItem(MAP_KEY)] ? localStorage.getItem(MAP_KEY) : "ffs");
   renderTabs(); renderWho();
-  if (S.code) await signIn(S.code);
-  await loadMap(id);
+  if (S.code) await signIn(S.code);  // the map loads after sign-in, and only the editor's own maps
 })();

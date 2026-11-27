@@ -18,10 +18,14 @@ with sync_playwright() as p:
     pg.on("pageerror", lambda e: log("PAGE ERROR:", e))
     pg.on("dialog", lambda d: (log("dialog:", d.message[:120]), d.accept()))
     pg.route("https://raw.githubusercontent.com/**", raw)
-    pg.goto("http://127.0.0.1:8787/#ffs"); pg.wait_for_function("document.querySelector('#spotTable tr')", timeout=15000)
-    log("ffs loaded:", pg.inner_text("#status"))
+    pg.goto("http://127.0.0.1:8787/#ffs"); pg.wait_for_selector("#codeInput")
+    vis = pg.evaluate("[...document.querySelectorAll('.card, .mapcol, #mapTabs')].filter(e => e.offsetParent !== null).map(e => e.id || e.className)")
+    log("signed out, visible:", vis); assert vis == ["cardSignin"], vis
+    pg.screenshot(path=str(OUT / "signed_out.png"))
     pg.fill("#codeInput", "test-admn-code"); pg.click("#signinForm button")
     pg.wait_for_selector("#cardAdmin:not([hidden])"); log("signed in:", pg.inner_text("#who"))
+    pg.wait_for_function("document.querySelector('#spotTable tr')", timeout=15000)
+    log("ffs loaded:", pg.inner_text("#status"), "| tabs:", pg.inner_text("#mapTabs").replace("\n", " "))
     # import Ffs names from the ksmapper labels
     pg.click("#cardImport summary"); log("import info:", pg.inner_text("#importInfo"))
     pg.click("#importBtn"); pg.wait_for_function("document.querySelector('#importInfo').textContent.includes('Imported') || document.querySelector('#importInfo .bad')")
@@ -38,11 +42,17 @@ with sync_playwright() as p:
     pg.screenshot(path=str(OUT / "ffs_admin.png"), full_page=False)
     # switch to VAR as Luna
     pg.click("#signOut"); pg.fill("#codeInput", luna); pg.click("#signinForm button"); pg.wait_for_function("document.querySelector('#who').textContent.startsWith('Luna')")
-    pg.click('#mapTabs button[data-map="var"]'); pg.wait_for_function("document.querySelector('#status').textContent.startsWith('VAR')")
-    log("var:", pg.inner_text("#status"))
+    pg.wait_for_function("document.querySelector('#status').textContent.startsWith('VAR')")
+    log("var:", pg.inner_text("#status"), "| tabs:", pg.inner_text("#mapTabs"), "| buttons:", pg.locator("#mapTabs button").count())
     # pick BT1-001 from the list, assign a member from the chips, then move, swap
     pg.click('#spotTable tr[data-num="BT1-001"]'); pg.click("#cardMembers summary")
     first = pg.inner_text("#membersList li >> nth=0"); pg.click("#membersList li >> nth=0"); log("assigned", first, "to BT1-001")
+    pg.click('#spotTable tr[data-num="BT1-005"]'); pg.click("#assignName")
+    n = pg.locator("#suggest li[data-name]").count(); first_s = pg.inner_text("#suggest li >> nth=0"); log(f"picker: {n} members, first: {first_s!r}")
+    assert n > 50, n
+    pg.fill("#assignName", "pingu"); log("picker filtered:", pg.inner_text("#suggest").replace("\n", " | "))
+    pg.click("#suggest li >> nth=0"); log("picked into BT1-005:", pg.evaluate("effective('BT1-005')"))
+    pg.click('#pendingList [data-undo="BT1-005"]')
     pg.click('#spotTable tr[data-num="BT1-002"]'); pg.fill("#assignName", "Builder Pingu"); pg.click("#assignForm button")
     pg.click('#spotTable tr[data-num="BT1-003"]'); pg.fill("#assignName", "Builder Pingu"); pg.click("#assignForm button")
     log("move msg:", pg.inner_text("#assignMsg"))
@@ -67,7 +77,7 @@ with sync_playwright() as p:
     # mobile
     m = b.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=2)
     m.route("https://raw.githubusercontent.com/**", raw); m.on("pageerror", lambda e: log("MOBILE PAGE ERROR:", e))
-    m.goto("http://127.0.0.1:8787/#var"); m.wait_for_function("document.querySelector('#spotTable tr')")
+    m.goto("http://127.0.0.1:8787/#var"); m.fill("#codeInput", luna); m.click("#signinForm button"); m.wait_for_function("document.querySelector('#spotTable tr')")
     m.screenshot(path=str(OUT / "var_mobile.png"), full_page=False)
     log("mobile page width:", m.evaluate("document.documentElement.scrollWidth"), "viewport 390")
     xy = m.evaluate("(() => { const s = S.layout.byNum.get('BT2-002'); return S.geo.P(s.x+1, s.y+1); })()")
