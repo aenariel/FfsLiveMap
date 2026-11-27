@@ -49,7 +49,7 @@ jobs:
           done
           if [ -n "$missing" ]; then echo "::error::Missing secrets:$missing (ADMIN_CODE comes from EDITOR_ADMIN_CODE)"; exit 1; fi
           if [ ${#ADMIN_CODE} -lt 12 ]; then echo "::error::EDITOR_ADMIN_CODE must have at least 12 characters"; exit 1; fi
-          echo "Secrets present. GH_DISPATCH_TOKEN: $([ -n "$GH_DISPATCH_TOKEN" ] && echo set || echo not set, saves won't re-render right away)"
+          if [ -n "$GH_DISPATCH_TOKEN" ]; then echo "Secrets present. GH_DISPATCH_TOKEN: set"; else echo "Secrets present. GH_DISPATCH_TOKEN: not set (saves will not re-render right away)"; fi
 
       - run: npm ci --no-audit --no-fund
 
