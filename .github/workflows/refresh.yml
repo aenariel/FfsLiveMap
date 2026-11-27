@@ -20,13 +20,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # One job per kingdom, on separate machines, so the two Update Map requests never share an IP
+  # (MightPulse has an IP cooldown) and one kingdom's scan queue doesn't delay the other.
   refresh:
+    name: Refresh #${{ matrix.kingdom }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    outputs:
-      pages: ${{ steps.site.outputs.ready }}
-    env:
-      PAGES_DIR: ${{ secrets.PAGES_DIR }}
+    strategy:
+      fail-fast: false
+      matrix:
+        kingdom: [1130, 2116]
     steps:
       - uses: actions/checkout@v5
 
@@ -41,19 +44,65 @@ jobs:
         id: refresh
         continue-on-error: true
         run: |
-          FLAGS="--site site_build"
+          FLAGS="--kingdom ${{ matrix.kingdom }} --site site_build"
           if [ "${{ github.event_name == 'workflow_dispatch' && !inputs.update }}" = "true" ]; then
             FLAGS="$FLAGS --no-update"
           fi
           node refresh.cjs $FLAGS
 
-      - name: Commit and push
+      - name: Collect rendered files
         if: always()
         run: |
           # Only the files of maps that rendered successfully are listed in .refresh-files.
-          if [ ! -s .refresh-files ]; then echo "Nothing rendered, nothing to commit."; exit 0; fi
-          mkdir -p /tmp/out
-          while read -r f; do cp "$f" /tmp/out/; done < .refresh-files
+          mkdir -p out/files out/site
+          if [ -s .refresh-files ]; then
+            while read -r f; do echo "collect $f"; cp --parents "$f" out/files/; done < .refresh-files
+            cp .refresh-files "out/list-${{ matrix.kingdom }}.txt"
+          else
+            echo "Nothing rendered for #${{ matrix.kingdom }}."
+          fi
+          if ls site_build/*.html >/dev/null 2>&1; then cp site_build/*.html out/site/; fi
+          find out -type f | sort
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: maps-${{ matrix.kingdom }}
+          path: out
+          retention-days: 1
+          if-no-files-found: ignore
+
+      - name: Report failure
+        if: always() && steps.refresh.outcome == 'failure'
+        run: |
+          echo "::error::Refresh of #${{ matrix.kingdom }} reported a failure. See the job summary for details."
+          exit 1
+
+  # Commits every kingdom's images in one refresh commit and publishes all interactive pages together
+  # (a Pages deployment replaces the whole site, so it must hold every page).
+  publish:
+    needs: refresh
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      pages: ${{ steps.site.outputs.ready }}
+    env:
+      PAGES_DIR: ${{ secrets.PAGES_DIR }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: maps-*
+          path: /tmp/out
+          merge-multiple: true
+
+      - name: Commit and push
+        run: |
+          cat /tmp/out/list-*.txt 2>/dev/null | sort -u > /tmp/files.txt || true
+          if [ ! -s /tmp/files.txt ]; then echo "Nothing rendered, nothing to commit."; exit 0; fi
+          echo "Files to commit:"; cat /tmp/files.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           for i in 1 2 3; do
@@ -62,8 +111,8 @@ jobs:
             git fetch -q --depth=2 origin "$GITHUB_REF_NAME"
             git reset -q --hard "origin/$GITHUB_REF_NAME"
             TIP=$(git rev-parse HEAD)
-            cp /tmp/out/* .
-            git add $(cat .refresh-files)
+            (cd /tmp/out/files && cp -r . "$GITHUB_WORKSPACE/")
+            git add $(cat /tmp/files.txt)
             if git diff --cached --quiet; then echo "No changes to commit."; exit 0; fi
             # If the tip is the previous refresh, replace it instead of stacking a new commit:
             # old images never pile up in the history. Code commits are left untouched.
@@ -85,9 +134,10 @@ jobs:
         run: |
           if [ -z "$PAGES_DIR" ]; then echo "PAGES_DIR secret not set, skipping pages."; exit 0; fi
           if ! printf '%s' "$PAGES_DIR" | grep -Eq '^[A-Za-z0-9_-]{16,}$'; then echo "::error::PAGES_DIR must be 16+ letters, digits, - or _"; exit 1; fi
-          if ! ls site_build/*.html >/dev/null 2>&1; then echo "No pages rendered, skipping."; exit 0; fi
+          if ! ls /tmp/out/site/*.html >/dev/null 2>&1; then echo "No pages rendered, skipping."; exit 0; fi
           mkdir -p "_site/$PAGES_DIR"
-          cp site_build/*.html "_site/$PAGES_DIR/"
+          cp /tmp/out/site/*.html "_site/$PAGES_DIR/"
+          ls -l "_site/$PAGES_DIR"
           echo "ready=true" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-pages-artifact@v4
@@ -96,15 +146,9 @@ jobs:
           path: _site
           retention-days: 1
 
-      - name: Report failure
-        if: always() && steps.refresh.outcome == 'failure'
-        run: |
-          echo "::error::Refresh reported a failure. See the job summary for details."
-          exit 1
-
   pages:
-    needs: refresh
-    if: always() && needs.refresh.outputs.pages == 'true'
+    needs: publish
+    if: always() && needs.publish.outputs.pages == 'true'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

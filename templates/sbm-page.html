@@ -285,7 +285,10 @@ function parsePlan(csv) {
     const type = p[0].trim().toLowerCase();
     const x = parseInt(p[1], 10), y = parseInt(p[2], 10);
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    out.push({ type, x, y, label: (p[3] || "").trim().replace(/\|/g, ","), color: (p[4] || "").trim() });
+    // refresh.cjs appends the fixed spot number ("BT1-001") as the last field of city lines
+    const last = p.length > 6 ? p[p.length - 1].trim() : "";
+    const num = /^[A-Z0-9]+-\d{3,4}$/i.test(last) ? last.toUpperCase() : "";
+    out.push({ type, x, y, label: (p[3] || "").trim().replace(/\|/g, ","), color: (p[4] || "").trim(), num });
   }
   return out;
 }
@@ -340,13 +343,13 @@ function buildModel(planCsv, live, o) {
   const blockers = new Set();
   for (const c of cities) {
     const others = towns.filter(l => overlaps(l, c) && l !== c.found);
-    others.filter(l => !correct.has(l)).forEach(l => blockers.add(l));
+    others.filter(l => !correct.has(l)).forEach(l => { blockers.add(l); if (c.num && !c.found && !l.spot) l.spot = c.num; });
     c.detail = "";
     if (c.found) c.status = "in";
     else if (others.length) { c.status = "taken"; c.detail = others[0].name + (others.length > 1 ? ` +${others.length - 1}` : ""); }
     else c.status = "free";
   }
-  const placed = cities.filter(c => c.found).map(c => ({ ...c.found, ring: c.ring })).sort(byName);
+  const placed = cities.filter(c => c.found).map(c => ({ ...c.found, ring: c.ring, num: c.num })).sort(byName);
   const notPlaced = towns.filter(l => blockers.has(l) || (l.abbr === o.tag && !correct.has(l)))
     .map(l => ({ ...l, blocking: blockers.has(l) })).sort(byName);
   return { b1, b2, hq, cities, placed, notPlaced };
@@ -504,6 +507,7 @@ function draw(m, o) {
     }
     const lines = [];
     const ink = filled ? PNG.ink : PNG.emptyInk, sub = filled ? PNG.coord : PNG.emptyInk;
+    if (c.num) lines.push({ t: c.num, w: 700, s: 14, min: 11, f: F.mono, col: PNG.gold });
     lines.push({ t: filled ? c.found.name : (c.status === "taken" ? "blocked" : "free"), w: 600, s: 17, min: 10.5, f: F.body, col: c.status === "taken" ? st.col : ink });
     lines.push({ t: `${c.x} : ${c.y}`, w: 600, s: 15, min: 12, f: F.mono, col: sub });
     if (c.detail) lines.push({ t: c.detail, w: 600, s: 12.5, min: 10, f: F.body, col: st.col });
@@ -541,8 +545,15 @@ function draw(m, o) {
       const x = pad + col * cw, y = top + row * rowH + 22;
       const coord = `${u.x} : ${u.y}`;
       ctx.font = `600 18px ${F.mono}`;
-      const cwid = ctx.measureText(coord).width;
+      let cwid = ctx.measureText(coord).width;
       ctx.fillStyle = colour(u); ctx.textAlign = "right"; ctx.fillText(coord, x + cw - 24, y);
+      const tagNum = u.num || u.spot;  // spot held (placed) or spot blocked (blocker)
+      if (tagNum) {
+        ctx.font = `600 15px ${F.mono}`; ctx.fillStyle = u.num ? PNG.muted : PNG.block;
+        ctx.fillText(tagNum, x + cw - 24 - cwid - 14, y);
+        cwid += ctx.measureText(tagNum).width + 14;
+        ctx.font = `600 18px ${F.mono}`;
+      }
       let nx = x;
       if (dot) {
         ctx.beginPath(); ctx.arc(x + 12, y - 6, 12, 0, Math.PI * 2);
@@ -562,12 +573,12 @@ function draw(m, o) {
     const end = section(y0, "Members not correctly placed", un, uRows,
       u => u.blocking ? PNG.block : PNG.muted, u => (u.abbr !== o.tag ? `[${u.abbr || "no alliance"}] ` : "") + u.name);
     ctx.fillStyle = PNG.muted; ctx.font = `400 17px ${F.body}`; ctx.textAlign = "left";
-    ctx.fillText(`Current position shown. Orange: blocking a marked spot. Grey: ${o.tag} member not on a marked spot.`, pad, end + 30);
+    ctx.fillText(`Current position shown. Orange: blocking a marked spot (the spot number is shown). Grey: ${o.tag} member not on a marked spot.`, pad, end + 30);
   }
 
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   ctx.fillStyle = PNG.muted; ctx.font = `400 17px ${F.body}`;
-  ctx.fillText("Row 1 touches a bear trap, row 2 is one city further out. Coordinates are X : Y.", pad, Hc - 24);
+  ctx.fillText("Row 1 touches a bear trap, row 2 is one city further out. Coordinates are X : Y. Spot numbers (BT1-001…) are fixed and count outwards from each trap.", pad, Hc - 24);
   return cv;
 }
 

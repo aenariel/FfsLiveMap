@@ -1,12 +1,16 @@
-// Renders the SBM bear trap PNG without a browser, using the drawing code inside the SBM page itself.
-// Usage: node render-sbm.cjs <page.html> <plan.csv> <live.csv> <out.png> [page-new.html]
+// Renders a bear trap PNG without assigned spots (SBM, VAR) without a browser, using the drawing code inside the page itself.
+// Usage: node render-sbm.cjs <page.html> <plan.csv> <live.csv> <out.png> [page-new.html] [--tag SBM] [--kd #1130]
 //   plan.csv  — ksmapper export lines (type,x,y,label,colour)
 //   live.csv  — first line "at,<unix seconds>", then x,y,alliance,name per city (MightPulse snapshot)
 const fs = require("fs");
 const path = require("path");
 const { createCanvas, GlobalFonts } = require("@napi-rs/canvas");
 
-const [pagePath, planPath, livePath, outPath] = process.argv.slice(2);
+const argv = process.argv.slice(2), flags = {}, pos = [];
+for (let i = 0; i < argv.length; i++) argv[i].startsWith("--") ? (flags[argv[i].slice(2)] = argv[++i]) : pos.push(argv[i]);
+const [pagePath, planPath, livePath, outPath, outHtml] = pos;
+const TAG = flags.tag || "SBM", KD = flags.kd || "#1130";
+console.error(`render-sbm: ${TAG} ${KD} from ${path.basename(pagePath || "?")}`);
 if (!outPath) { console.error("usage: node render-sbm.cjs page.html plan.csv live.csv out.png"); process.exit(2); }
 
 // fonts: same families the page loads from Google Fonts
@@ -62,13 +66,13 @@ const atMatch = /^at,(\d+)/m.exec(liveTxt);
 const liveAt = atMatch ? Number(atMatch[1]) * 1000 : null;
 
 global.document = { createElement: () => createCanvas(10, 10) };
-const run = new Function("planCsv", "liveTxt", "liveAt", "fs", "outPath", "FALLBACK_STACK",
+const run = new Function("planCsv", "liveTxt", "liveAt", "fs", "outPath", "FALLBACK_STACK", "TAG", "KD",
   code + `
   F.body = '"IBM Plex Sans", "Noto Sans Arabic", ' + FALLBACK_STACK + ', sans-serif';
   F.mono = '"IBM Plex Mono", "IBM Plex Sans", ' + FALLBACK_STACK + ', monospace';
   F.display = '"Chakra Petch", "IBM Plex Sans", ' + FALLBACK_STACK + ', sans-serif';
   const live = { ...parseLive(liveTxt), at: liveAt };
-  const o = { tag: "SBM", kd: "#1130", key1: "BT1", key2: "BT2", radius: 18,
+  const o = { tag: TAG, kd: KD, key1: "BT1", key2: "BT2", radius: 18,
     planDate: fmtDay(Date.now()), updated: fmtUtc(Date.now()), liveDate: liveAt ? fmtUtc(liveAt) : "an unknown date" };
   const m = buildModel(planCsv, live, o);
   if (m.error) throw new Error(m.error);
@@ -78,10 +82,9 @@ const run = new Function("planCsv", "liveTxt", "liveAt", "fs", "outPath", "FALLB
   return { size: [cv.width, cv.height], spots: m.cities.length, correct: count.in || 0, blocked: count.taken || 0, free: count.free || 0,
     notCorrectlyPlaced: m.notPlaced.map(u => (u.abbr !== o.tag ? "[" + u.abbr + "] " : "") + u.name + " " + u.x + ":" + u.y + (u.blocking ? " (blocking)" : "")) };
 `);
-const summary = run(planCsv, liveTxt, liveAt, fs, outPath, FALLBACK_STACK);
+const summary = run(planCsv, liveTxt, liveAt, fs, outPath, FALLBACK_STACK, TAG, KD);
 
 // Optional 5th argument: write a copy of the page with this plan and snapshot embedded as its saved data.
-const outHtml = process.argv[6];
 if (outHtml) {
   const swap = (src, name, body) => {
     const i = src.indexOf(`const ${name} = {`);

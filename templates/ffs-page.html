@@ -463,7 +463,10 @@ function parsePlan(csv) {
     const type = p[0].trim().toLowerCase();
     const x = parseInt(p[1], 10), y = parseInt(p[2], 10);
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    out.push({ type, x, y, label: (p[3] || "").trim().replace(/\|/g, ","), color: (p[4] || "").trim() });
+    // refresh.cjs appends the fixed spot number ("BT1-001") as the last field of city lines
+    const last = p.length > 6 ? p[p.length - 1].trim() : "";
+    const num = /^[A-Z0-9]+-\d{3,4}$/i.test(last) ? last.toUpperCase() : "";
+    out.push({ type, x, y, label: (p[3] || "").trim().replace(/\|/g, ","), color: (p[4] || "").trim(), num });
   }
   return out;
 }
@@ -778,6 +781,7 @@ function draw(m, o) {
     }
     const lines = [];
     const ink = empty ? PNG.emptyInk : PNG.ink, sub = empty ? PNG.emptyInk : PNG.coord;
+    if (c.num) lines.push({ t: c.num, w: 700, s: 14, min: 11, f: F.mono, col: PNG.gold });
     lines.push({ t: c.named ? c.label : (c.status === "taken" ? "blocked" : "free"), w: 600, s: 17, min: 10.5, f: F.body, col: c.status === "taken" ? st.col : ink });
     lines.push({ t: `${c.x} : ${c.y}`, w: 600, s: 15, min: 12, f: F.mono, col: sub });
     if (c.detail) lines.push({ t: c.detail, w: 600, s: 12.5, min: 10, f: F.body, col: empty ? st.col : PNG.ink });
@@ -823,8 +827,14 @@ function draw(m, o) {
       ctx.fillText(String(c.ring), x + 12, y - 5); ctx.textBaseline = "alphabetic";
       const coord = `${c.x} : ${c.y}`;
       ctx.font = `600 18px ${F.mono}`;
-      const cwid = ctx.measureText(coord).width;
+      let cwid = ctx.measureText(coord).width;
       ctx.fillStyle = PNG.gold; ctx.textAlign = "right"; ctx.fillText(coord, x + cw - 24, y);
+      if (c.num) {
+        ctx.font = `600 15px ${F.mono}`; ctx.fillStyle = PNG.muted;
+        ctx.fillText(c.num, x + cw - 24 - cwid - 14, y);
+        cwid += ctx.measureText(c.num).width + 14;
+        ctx.font = `600 18px ${F.mono}`;
+      }
       ctx.textAlign = "left"; ctx.fillStyle = PNG.ink;
       const t = fit(ctx, c.label, cw - cwid - 76, 500, 18, 13, F.body);
       ctx.fillText(t, x + 34, y);
@@ -849,7 +859,7 @@ function draw(m, o) {
 
   ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
   ctx.fillStyle = PNG.muted; ctx.font = `400 17px ${F.body}`;
-  ctx.fillText("Row 1 touches a bear trap, row 2 is one city further out. Coordinates are each city's X : Y as planned in ksmapper. BT3 is planned for later.", pad, Hc - 24);
+  ctx.fillText("Row 1 touches a bear trap, row 2 is one city further out. Coordinates are each city's X : Y as planned in ksmapper. Spot numbers (BT1-001…) are fixed. BT3 is planned for later.", pad, Hc - 24);
   return cv;
 }
 
