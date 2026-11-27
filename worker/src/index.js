@@ -161,7 +161,7 @@ async function submit(request, env, ctx, map, who) {
   }
   console.log(`submit ${map}: ${who.name} saved v${version}, ${diff.length} change(s): ${diff.map(d => `${d.spot} "${d.before}"->"${d.after}"`).join("; ").slice(0, 500)}`);
   ctx.waitUntil(dispatchRender(env, `${map} v${version} by ${who.name}`).catch(e => console.log("dispatch failed: " + e.message)));
-  return json({ ok: true, saved: diff.length, used: used + 1, limit, ...(await readMap(env, map)) });
+  return json({ ok: true, saved: diff.length, used: used + 1, limit, rerender: !!env.GH_DISPATCH_TOKEN, ...(await readMap(env, map)) });
 }
 
 async function editorsApi(request, env, who, parts) {

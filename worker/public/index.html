@@ -1,1 +1,114 @@
-<!doctype html><title>Hive editor</title><p>Editor page coming soon.</p>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Hive editor</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <h1><span class="gold">Hive</span> editor</h1>
+  <div class="maps" id="mapTabs"></div>
+  <div class="who" id="who">Not signed in</div>
+</header>
+
+<main class="layout">
+  <section class="mapcol">
+    <div class="maptools">
+      <button id="zoomOut" title="Zoom out">−</button>
+      <button id="zoomIn" title="Zoom in">+</button>
+      <button id="zoomFit" title="Fit to width">Fit</button>
+      <span class="legend" id="legend"></span>
+    </div>
+    <div class="stage" id="stage"><canvas id="map"></canvas></div>
+    <div class="status" id="status">Loading…</div>
+  </section>
+
+  <aside class="side">
+    <details class="card" id="cardSignin" open>
+      <summary>Sign in</summary>
+      <div class="body">
+        <form id="signinForm" class="row">
+          <input id="codeInput" autocomplete="off" placeholder="Your code, e.g. ABCD-EFGH-JKLM" spellcheck="false">
+          <button type="submit">Sign in</button>
+        </form>
+        <div id="signinInfo" class="muted small"></div>
+        <button id="signOut" class="link" hidden>Sign out on this device</button>
+      </div>
+    </details>
+
+    <details class="card" id="cardSpot" open>
+      <summary>Selected spot</summary>
+      <div class="body" id="spotBody"><p class="muted">Tap a spot on the map or in the list.</p></div>
+    </details>
+
+    <details class="card" id="cardPending" open>
+      <summary>Changes not saved yet <span class="count" id="pendingCount">0</span></summary>
+      <div class="body">
+        <ul class="plain" id="pendingList"></ul>
+        <div class="row">
+          <button id="submitBtn" class="primary" disabled>Submit</button>
+          <button id="discardBtn" disabled>Discard all</button>
+        </div>
+        <div id="submitMsg" class="small"></div>
+      </div>
+    </details>
+
+    <details class="card" id="cardSpots" open>
+      <summary>Spots <span class="count" id="spotsCount"></span></summary>
+      <div class="body">
+        <input id="spotFilter" placeholder="Filter by number, name or X:Y" autocomplete="off">
+        <div class="tablewrap"><table class="spots" id="spotTable"></table></div>
+      </div>
+    </details>
+
+    <details class="card" id="cardMembers">
+      <summary>Members without a spot <span class="count" id="membersCount"></span></summary>
+      <div class="body">
+        <p class="muted small">Alliance members on the last MightPulse scan who hold no spot. Tap a name to put it on the selected spot.</p>
+        <ul class="plain names" id="membersList"></ul>
+      </div>
+    </details>
+
+    <details class="card" id="cardOrphans" hidden>
+      <summary>Assignments without a spot <span class="count" id="orphansCount"></span></summary>
+      <div class="body">
+        <p class="muted small">These spot numbers are no longer in the ksmapper layout. Move the players to a spot, or clear them.</p>
+        <ul class="plain" id="orphansList"></ul>
+      </div>
+    </details>
+
+    <details class="card" id="cardHistory">
+      <summary>History</summary>
+      <div class="body"><ul class="plain small" id="historyList"><li class="muted">Sign in to see the history.</li></ul></div>
+    </details>
+
+    <details class="card" id="cardAdmin" hidden>
+      <summary>Editors (admin)</summary>
+      <div class="body">
+        <div id="editorsList"></div>
+        <form id="addEditor" class="stack">
+          <input id="newName" placeholder="New editor's name" autocomplete="off">
+          <div class="row" id="newMaps"></div>
+          <label class="small"><input type="checkbox" id="newAdmin"> Admin (can manage editors)</label>
+          <button type="submit">Add editor</button>
+        </form>
+        <div id="codeBox" class="codebox" hidden></div>
+      </div>
+    </details>
+
+    <details class="card" id="cardImport" hidden>
+      <summary>Import from ksmapper (admin)</summary>
+      <div class="body">
+        <p class="muted small">Replaces every assignment of this map with the names written on the spots in the ksmapper plan (labels that are spot numbers or "city" are skipped).</p>
+        <div id="importInfo" class="small"></div>
+        <button id="importBtn">Import</button>
+      </div>
+    </details>
+  </aside>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
